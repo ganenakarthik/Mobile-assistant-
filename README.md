@@ -1,3 +1,8 @@
+---
+**Developer**: REX | Instagram: [@THEDEVREX](https://instagram.com/THEDEVREX)
+
+---
+
 # NOVA - Next-Generation Interactive Voice Assistant
 
 ![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
@@ -5,11 +10,11 @@
 ![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)
 ![Room Database](https://img.shields.io/badge/Room%20DB-12100E?style=for-the-badge&logo=sqlite&logoColor=white)
 
-**NOVA** is a high-performance, multimodally aligned Android voice assistant delivering ultra-low latency, personality-driven task execution, and intelligent hardware automation. Moving beyond standard assistant wrappers, NOVA integrates real-time hardware telemetry, on-device semantic memory, clipboard interception intelligence, and direct wireless control—all within a reactive, modern Android architecture.
+**NOVA** is a high-performance, multimodally aligned Android voice assistant delivering ultra-low latency, personality-driven task execution, and intelligent hardware automation. Moving beyond standard voice assistants, NOVA adapts its operational personality to your communication style, manages hardware with zero-menu control, and preserves rich conversational context through local database persistence.
 
 ## 🎯 Executive Summary
 
-NOVA reimagines mobile voice assistance through a focus on **fluid, high-fidelity interaction**. Users communicate via natural voice or keyboard, toggle hardware peripherals instantly, record contextual thoughts to a secure database, inspect system parameters, and trigger intelligent actions through screen capture and background processing. The system emphasizes **low-latency responsiveness**, **data privacy**, and **personality-driven engagement**.
+NOVA reimagines mobile voice assistance through a focus on **fluid, high-fidelity interaction**. Users communicate via natural voice or keyboard, toggle hardware peripherals instantly, record contextual notes with semantic indexing, and harness advanced AI reasoning with complete offline fallback capabilities.
 
 ---
 
@@ -67,43 +72,43 @@ NOVA employs a **reactive, event-driven MVVM architecture** designed for maximum
 │        (Voice, Keyboard, UI Gestures)              │
 └────────────────┬────────────────────────────────────┘
                  │
-        ┌────────▼────────┐
-        │ VoiceAssistant  │
-        │     Panel       │  ◄─ Jetpack Compose UI State
-        │   (StateFlow)   │
-        └────────┬────────┘
-                 │
-    ┌────────────┼────────────┐
-    │            │            │
-    ▼            ▼            ▼
-┌────────┐  ┌────────┐  ┌────────┐
-│Clipboard│ │Context │ │Vocal   │
-│Monitor  │ │Sensors │ │Decoders│
-└────────┘  └────────┘  └────────┘
-    │            │            │
-    └────────────┼────────────┘
-                 │
-        ┌────────▼────────────────┐
-        │  AI Processing Layer    │
-        │ (Personality Engine,    │
-        │  Gemini, Heuristics)    │
-        └────────┬────────────────┘
-                 │
-        ┌────────▼──────────────────┐
-        │  Room Database            │
-        │  (Neural Vault)           │
-        │ • Chat Logs               │
-        │ • Brain Dumps             │
-        │ • User Preferences        │
-        │ • System Telemetry        │
-        └───────────────────────────┘
+         ┌────────▼────────┐
+         │ VoiceAssistant  │
+         │     Panel       │  ◄─ Jetpack Compose UI State
+         │   (StateFlow)   │
+         └────────┬────────┘
+                  │
+     ┌────────────┼────────────┐
+     │            │            │
+     ▼            ▼            ▼
+ ┌────────┐  ┌────────┐  ┌────────┐
+ │Clipboard│ │Context │ │Vocal   │
+ │Monitor  │ │Sensors │ │Decoders│
+ └────────┘  └────────┘  └────────┘
+     │            │            │
+     └────────────┼────────────┘
+                  │
+         ┌────────▼────────────────┐
+         │  AI Processing Layer    │
+         │ (Personality Engine,    │
+         │  Gemini, Heuristics)    │
+         └────────┬────────────────┘
+                  │
+         ┌────────▼──────────────────┐
+         │  Room Database            │
+         │  (Neural Vault)           │
+         │ • Chat Logs               │
+         │ • Brain Dumps             │
+         │ • User Preferences        │
+         │ • System Telemetry        │
+         └───────────────────────────┘
 
-┌─────────────────────────────────────┐
-│  Hardware Layer (Android APIs)      │
-│ • BatteryManager • WifiManager      │
-│ • BluetoothAdapter • FileProvider   │
-│ • SpeechRecognizer • TTS            │
-└─────────────────────────────────────┘
+ ┌─────────────────────────────────────┐
+ │  Hardware Layer (Android APIs)      │
+ │ • BatteryManager • WifiManager      │
+ │ • BluetoothAdapter • FileProvider   │
+ │ • SpeechRecognizer • TTS            │
+ └─────────────────────────────────────┘
 ```
 
 ### Core Architectural Principles
@@ -137,10 +142,10 @@ NOVA employs a **reactive, event-driven MVVM architecture** designed for maximum
 
 ### Prerequisites
 
-- **Android Studio** (latest version recommended)
 - **Android SDK 24+** (API level 24 or higher)
 - **Gradle 7.0+**
 - **Java Development Kit (JDK) 11+**
+- **Git** installed on your system
 - **API Key** for Gemini Flash integration (see Configuration)
 
 ### Installation
@@ -151,11 +156,10 @@ NOVA employs a **reactive, event-driven MVVM architecture** designed for maximum
    cd Mobile-assistant-
    ```
 
-2. **Open in Android Studio**
-   - Launch Android Studio
-   - Select **Open an existing Android Studio project**
-   - Navigate to the cloned repository directory
-   - Allow Android Studio to auto-fix any incompatibilities
+2. **Open in IDE (Android Studio, IntelliJ, or equivalent)**
+   - Open your IDE
+   - Select **File → Open** and navigate to the cloned repository directory
+   - Allow Gradle to sync and auto-fix any incompatibilities
 
 3. **Configure API Keys**
    - Create a `.env` file in the project root
@@ -166,7 +170,7 @@ NOVA employs a **reactive, event-driven MVVM architecture** designed for maximum
    - Alternatively, configure via `build.gradle.kts` buildConfig fields
 
 4. **Sync Gradle Dependencies**
-   - Android Studio will prompt automatically
+   - Your IDE will prompt automatically for Gradle sync
    - Allow all dependencies to download and compile
 
 5. **Set Permissions**
@@ -339,7 +343,7 @@ Dynamically switches system prompts, response tone, and behavioral profiles. Eac
 Runs on UI thread, automatically intercepts clipboard changes when dashboard is visible. Triggers contextual action suggestions via composables with four instant processing options.
 
 ### Synaptic Node Interactor
-Interactive neural network visualization showing conversation context and memory nodes. Touch to warp synapses, representing memory synthesis and context mapping. Visual feedback for cognitive processing.
+Interactive neural network visualization showing conversation context and memory nodes. Touch to warp synapses, representing memory synthesis and context mapping. Visual feedback for cognitive processing stages.
 
 ### Hardware Telemetry Layer
 Encapsulated wrappers around BatteryManager, WifiManager, and BluetoothAdapter. Exposes clean APIs for state queries and state transitions with real-time event broadcasting.
@@ -560,3 +564,7 @@ NOVA represents a deep exploration of modern Android architecture, reactive prog
 ---
 
 Built with ❤️ by **REX**
+
+---
+
+**Developer**: REX | Instagram: [@THEDEVREX](https://instagram.com/THEDEVREX)
