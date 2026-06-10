@@ -325,6 +325,26 @@ class AlarmSkill : AppTaskSkill {
             hour += 12
         } else if (isAm && hour == 12) {
             hour = 0
+        } else if (!isPm && !isAm) {
+            // Contextual AM/PM computation based on current physical time parameters
+            val cal = java.util.Calendar.getInstance()
+            val currHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            if (hour in 1..11) {
+                val currentAm = currHour < 12
+                val currentHour12 = if (currHour % 12 == 0) 12 else currHour % 12
+                
+                if (currentAm) {
+                    if (hour <= currentHour12) {
+                        // Specified hour is in the past for today's morning, so select afternoon/evening (PM)
+                        hour += 12
+                    }
+                } else {
+                    if (hour > currentHour12) {
+                        // Current afternoon, specified hour is in the future relative to 12h clock, so select tonight (PM)
+                        hour += 12
+                    }
+                }
+            }
         }
         
         if (hour in 0..23 && minute in 0..59) {

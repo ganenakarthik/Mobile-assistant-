@@ -628,4 +628,38 @@ class AutomationAccessibilityService : AccessibilityService() {
             }
         }
     }
+
+    fun takeSystemScreenshot(callback: (android.graphics.Bitmap?) -> Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+            try {
+                takeScreenshot(
+                    android.view.Display.DEFAULT_DISPLAY,
+                    executor,
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(screenshotResult: ScreenshotResult) {
+                            val hardwareBuffer = screenshotResult.hardwareBuffer
+                            val bitmap = android.graphics.Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.colorSpace)
+                            if (bitmap != null) {
+                                val copy = bitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+                                callback(copy)
+                            } else {
+                                callback(null)
+                            }
+                            hardwareBuffer.close()
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            callback(null)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                callback(null)
+            }
+        } else {
+            callback(null)
+        }
+    }
 }

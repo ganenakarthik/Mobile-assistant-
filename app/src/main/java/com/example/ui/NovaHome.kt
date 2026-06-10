@@ -359,6 +359,7 @@ fun NovaMockupHeader(
                 val headerTitleText = when (activePage) {
                     "DIALOGUE" -> "Chat with Nova"
                     "BROWSER" -> "Nova Core Browser"
+                    "COGNITION" -> "AI Capability Manager"
                     "APIS" -> "Public APIs Hub"
                     "MEMORY" -> "Memory & Preferences"
                     "SETTINGS" -> "Settings & Permissions"
@@ -437,7 +438,7 @@ fun NovaLuxuryFloatingNav(
                 NavigationNavItem("ORB", Icons.Default.Home, "Home"),
                 NavigationNavItem("DIALOGUE", Icons.Default.Send, "Chat"),
                 NavigationNavItem("BROWSER", Icons.Default.Search, "Browser"),
-                NavigationNavItem("APIS", Icons.Default.Build, "APIs"),
+                NavigationNavItem("COGNITION", Icons.Default.Build, "Cognition"),
                 NavigationNavItem("MEMORY", Icons.Default.Person, "Memory")
             )
 

@@ -91,13 +91,14 @@ class NovaForegroundService : Service() {
             android.Manifest.permission.RECORD_AUDIO
         ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         val isAppInForeground = MainActivity.isMainActivityActive || AssistActivity.isCurrentOverlayActive
+        val isWakeWordEnabled = getSharedPreferences("nova_wake_word_prefs", Context.MODE_PRIVATE).getBoolean("wake_word_service_enabled", false)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             var type = 0
             if (Build.VERSION.SDK_INT >= 34) {
                 type = type or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             }
-            if (hasMicPermission) {
+            if (isWakeWordEnabled && hasMicPermission) {
                 type = type or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             }
             try {
@@ -127,7 +128,6 @@ class NovaForegroundService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
         
-        val isWakeWordEnabled = getSharedPreferences("nova_wake_word_prefs", Context.MODE_PRIVATE).getBoolean("wake_word_service_enabled", false)
         if (!isListeningLoopActive) {
             isListeningLoopActive = true
             WakeWordDebugManager.refreshDiagnostics(this)
@@ -155,6 +155,7 @@ class NovaForegroundService : Service() {
     }
 
     private fun promoteToMicrophoneForegroundIfNeeded() {
+        val isWakeWordEnabled = getSharedPreferences("nova_wake_word_prefs", Context.MODE_PRIVATE).getBoolean("wake_word_service_enabled", false)
         val notification = createNotification()
         val hasMicPermission = androidx.core.content.ContextCompat.checkSelfPermission(
             this,
@@ -165,7 +166,7 @@ class NovaForegroundService : Service() {
             if (Build.VERSION.SDK_INT >= 34) {
                 type = type or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             }
-            if (hasMicPermission) {
+            if (isWakeWordEnabled && hasMicPermission) {
                 type = type or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             }
             try {
@@ -198,6 +199,12 @@ class NovaForegroundService : Service() {
     private fun startContinuousSpeechRecognizer() {
         handler?.post {
             if (!isListeningLoopActive) return@post
+            
+            val isWakeWordEnabled = getSharedPreferences("nova_wake_word_prefs", Context.MODE_PRIVATE).getBoolean("wake_word_service_enabled", false)
+            if (!isWakeWordEnabled) {
+                android.util.Log.d("NovaForegroundService", "Background wake word is disabled. Aborting continuous speech recognizer startup.")
+                return@post
+            }
             
             // Explicitly verify RECORD_AUDIO permission before initializing SpeechRecognizer to prevent AppOps errors
             val micGranted = androidx.core.content.ContextCompat.checkSelfPermission(
@@ -268,8 +275,8 @@ class NovaForegroundService : Service() {
                                 return
                             }
                             
-                            // Restart listening unless service stopped
-                            restartRecognizer(600)
+                            // Restart listening unless service stopped (using minimum 3000ms cooldown)
+                            restartRecognizer(3000)
                         }
 
                         override fun onResults(results: android.os.Bundle?) {
@@ -281,15 +288,16 @@ class NovaForegroundService : Service() {
                             
                             val matchesKeyword = rawLower.contains("hey nova") || 
                                                  rawLower.contains("ok nova") || 
-                                                  rawLower.contains("wake up") || 
-                                                  rawLower == "nova" ||
-                                                  rawLower.startsWith("nova ") ||
-                                                  rawLower.endsWith(" nova")
+                                                   rawLower.contains("wake up") || 
+                                                   rawLower == "nova" ||
+                                                   rawLower.startsWith("nova ") ||
+                                                   rawLower.endsWith(" nova")
                             
                             if (matchesKeyword) {
                                 triggerEngagementSequence(command)
                             }
-                            restartRecognizer(100)
+                            // Using minimum 3000ms cooldown to prevent rapid mic restart flickering
+                            restartRecognizer(3000)
                         }
 
                         override fun onPartialResults(partialResults: android.os.Bundle?) {
@@ -299,10 +307,10 @@ class NovaForegroundService : Service() {
                             
                             val matchesKeyword = rawLower.contains("hey nova") || 
                                                  rawLower.contains("ok nova") || 
-                                                  rawLower.contains("wake up") || 
-                                                  rawLower == "nova" ||
-                                                  rawLower.startsWith("nova ") ||
-                                                  rawLower.endsWith(" nova")
+                                                   rawLower.contains("wake up") || 
+                                                   rawLower == "nova" ||
+                                                   rawLower.startsWith("nova ") ||
+                                                   rawLower.endsWith(" nova")
                             
                             if (matchesKeyword) {
                                 triggerEngagementSequence(command)
@@ -354,7 +362,7 @@ class NovaForegroundService : Service() {
         }
 
         val isAppInForeground = MainActivity.isMainActivityActive || AssistActivity.isCurrentOverlayActive
-        val finalDelay = if (!isAppInForeground) 15000L else delayMs
+        val finalDelay = if (!isAppInForeground) 15000L else Math.max(3000L, delayMs)
 
         handler?.postDelayed({
             if (isListeningLoopActive) {

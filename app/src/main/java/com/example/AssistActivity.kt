@@ -30,6 +30,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -114,6 +115,13 @@ fun AssistOverlayScreen(
     var isListening by remember { mutableStateOf(false) }
     var isThinking by remember { mutableStateOf(false) }
     var isSpeakingActive by remember { mutableStateOf(false) }
+
+    var isScreenshotHiding by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        com.example.ui.globalScreenshotHider = { h ->
+            isScreenshotHiding = h
+        }
+    }
 
     // Floating particles state for alive look (no static screens)
     val particles = remember {
@@ -318,7 +326,8 @@ fun AssistOverlayScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
+            .background(Color.Black.copy(alpha = if (isScreenshotHiding) 0f else 0.5f))
+            .alpha(if (isScreenshotHiding) 0f else 1f)
             .clickable(enabled = !isListening && !isThinking && !isSpeakingActive) { onFinish() }, // Dismiss on touching the background area only when idle
         contentAlignment = Alignment.BottomCenter
     ) {
