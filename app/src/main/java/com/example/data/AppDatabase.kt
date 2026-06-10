@@ -5,12 +5,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Task::class, InventoryItem::class, ConversationMessage::class, IndexedDbStore::class], version = 2, exportSchema = false)
+@Database(entities = [Task::class, InventoryItem::class, ConversationMessage::class, IndexedDbStore::class, Reminder::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract val taskDao: TaskDao
     abstract val inventoryDao: InventoryDao
     abstract val conversationDao: ConversationMessageDao
     abstract val indexedDbDao: IndexedDbStoreDao
+    abstract val reminderDao: ReminderDao
 
     companion object {
         @Volatile

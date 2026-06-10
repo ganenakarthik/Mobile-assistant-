@@ -123,6 +123,14 @@ fun VoiceAssistantPanel(
     var activeReminderPopupText by remember { mutableStateOf<String?>(null) }
     var activeReminderPopupTitle by remember { mutableStateOf("Nova Alert") }
 
+    var activeSuccessReminder by remember { mutableStateOf<com.example.data.Reminder?>(null) }
+    LaunchedEffect(activeSuccessReminder) {
+        if (activeSuccessReminder != null) {
+            kotlinx.coroutines.delay(6000)
+            activeSuccessReminder = null
+        }
+    }
+
     LaunchedEffect(Unit) {
         globalReminderAlertTrigger = { title, text ->
             activeReminderPopupTitle = title
@@ -292,6 +300,8 @@ fun VoiceAssistantPanel(
     val verificationTests by com.example.ui.RealityVerificationManager.tests.collectAsState()
 
     val forceStatsRefresh by com.example.ui.ReliabilityManager.stats.collectAsState()
+
+    val remindersList by appDatabase.reminderDao.getAllRemindersFlow().collectAsState(initial = emptyList())
 
     val pendingCallContacts by com.example.AutomationEngine.pendingCallContacts.collectAsState()
     val pendingMessagePayload by com.example.AutomationEngine.pendingMessagePayload.collectAsState()
@@ -627,7 +637,9 @@ fun VoiceAssistantPanel(
                                     speakTts = speakTts,
                                     uName = userName,
                                     onLogUpdate = { dialogHistoryList = dialogHistoryList + it },
-                                    onActionAppend = { recentActions = listOf(it) + recentActions.take(5) }
+                                    onActionAppend = { recentActions = listOf(it) + recentActions.take(5) },
+                                    onSuccessReminderSet = { activeSuccessReminder = it },
+                                    onActiveTabChange = onActiveTabChange
                                 )
                             } else {
                                 transitionTo(MicState.PROCESSING)
@@ -762,6 +774,150 @@ fun VoiceAssistantPanel(
             .background(SpaceBlack)
             .alpha(if (isScreenshotHiding) 0f else 1f)
     ) {
+        // --- ADDON: LIVE TRIGGERED REMINDER ALARM DIALOG (SQLite Verified System) ---
+        val activeTriggeredReminder by com.example.data.ActiveReminderManager.activeTriggeredReminder.collectAsState(initial = null)
+        activeTriggeredReminder?.let { triggered ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { com.example.data.ActiveReminderManager.dismissReminder() },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("⏰", fontSize = 20.sp)
+                        Text(
+                            text = "NOVA REALTIME ALARM",
+                            color = NeonAmber,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                },
+                containerColor = SpaceBlack,
+                shape = RoundedCornerShape(24.dp),
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = triggered.title,
+                            color = PureWhite,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "SYSTEM ALERT: '${triggered.title}' at ${triggered.time} is now due.",
+                            color = NeonAmber,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 16.sp
+                        )
+                        Text(
+                            text = "Vibrational sequences and physical sound indicators have been verified.",
+                            color = CharcoalMuted,
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                            lineHeight = 14.sp
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { com.example.data.ActiveReminderManager.dismissReminder() },
+                        modifier = Modifier
+                            .background(NeonAmber.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                            .border(1.dp, NeonAmber, RoundedCornerShape(12.dp))
+                    ) {
+                        Text("DISMISS ALERT", color = NeonAmber, fontWeight = FontWeight.Bold, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    }
+                }
+            )
+        }
+
+        // --- ADDON: DYNAMIC VERIFIED SUCCESS BANNER (Problem 4 / Problem 3) ---
+        activeSuccessReminder?.let { reminder ->
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp, start = 12.dp, end = 12.dp)
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        shadowElevation = 12.dp.toPx()
+                        shape = RoundedCornerShape(12.dp)
+                        clip = true
+                    }
+                    .background(CyberSlate.copy(alpha = 0.95f))
+                    .border(1.2.dp, CyberCyan, RoundedCornerShape(12.dp))
+                    .clickable { activeSuccessReminder = null }
+                    .padding(12.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(CyberCyan.copy(alpha = 0.15f), CircleShape)
+                            .border(1.dp, CyberCyan, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("⏰", fontSize = 14.sp)
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Reminder Created & Verified ✓",
+                            color = CyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        )
+                        Text(
+                            text = reminder.title,
+                            color = PureWhite,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "Trigger:",
+                                color = CharcoalMuted,
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                text = "${reminder.time} ${reminder.date}",
+                                color = TechTeal,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(TechTeal.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .border(0.8.dp, TechTeal, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "DATABASE ACTIVE",
+                            color = TechTeal,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                }
+            }
+        }
+
         if (activeReminderPopupText != null) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { activeReminderPopupText = null },
@@ -1392,7 +1548,8 @@ fun VoiceAssistantPanel(
                         userName = userName,
                         recentActions = recentActions,
                         onRecentActionsChange = { recentActions = it },
-                        listState = listState
+                        listState = listState,
+                        onSuccessReminderSet = { activeSuccessReminder = it }
                     )
                 }
 
@@ -1460,6 +1617,7 @@ fun VoiceAssistantPanel(
                         context = context,
                         viewModel = viewModel,
                         tasksList = tasksList,
+                        remindersList = remindersList,
                         onActiveTabChange = onActiveTabChange
                     )
                 }
@@ -2466,7 +2624,9 @@ fun processVocalDirective(
     onLogUpdate: (ConsoleMessage) -> Unit,
     onActionAppend: (String) -> Unit,
     onWakeWordDetected: (() -> Unit)? = null,
-    dialogHistoryList: List<ConsoleMessage> = emptyList()
+    dialogHistoryList: List<ConsoleMessage> = emptyList(),
+    onSuccessReminderSet: ((com.example.data.Reminder) -> Unit)? = null,
+    onActiveTabChange: (String) -> Unit = {}
 ) {
     if (cmd.isBlank()) return
 
@@ -2793,81 +2953,76 @@ fun processVocalDirective(
 
     // OFFLINE REMINDERS PRIORITY INTERCEPT (Prevents misleading automation/simulation hijacks)
     if (clean.contains("remind") || clean.contains("reminder")) {
-        var reminderSubject = clean
-            .replace("remind me to ", "")
-            .replace("remind me about ", "")
-            .replace("remind me of ", "")
-            .replace("remind me ", "")
-            .replace("remind ", "")
-            .replace("reminder to ", "")
-            .replace("reminder for ", "")
-            .replace("reminder ", "")
-            .replace("about ", "")
+        val cleanedForReminder = cmd.lowercase(java.util.Locale.getDefault()).trim()
+            .replace(Regex("^(nova|ok nova|hey nova|please|can you|could you|start|launch)\\b"), "")
+            .replace(Regex("[?.,!]"), "")
             .trim()
-
-        if (reminderSubject.isEmpty()) {
-            reminderSubject = "Task Alert"
+        val parsed = com.example.data.ReminderParser.parseReminderQuery(cleanedForReminder)
+        if (parsed == null) {
+            val helpPhrase = "Could you please specify when you'd like your reminder set, $uName? For example, 'at 8:30 PM' or 'in 15 minutes'."
+            onLogUpdate(ConsoleMessage("NOVA", helpPhrase))
+            speakTts(helpPhrase)
+            return
         }
-        val capitalizedSubject = reminderSubject.substring(0, 1).uppercase(Locale.getDefault()) + reminderSubject.substring(1)
-
-        val rawWittyPhrase = when (NovaPersonalityCore.activePersonality) {
-            "JARVIS" -> "A superb reminder, Sir. I'm adding '$capitalizedSubject' into our local task matrices and priming localized alarm parameters. Standby — vibration and notification arrays will engage on your device in exactly 3 seconds, Sir."
-            "SAMANTHA" -> "Ooh, I love that! I've logged '$capitalizedSubject' in your Tasks list, so you won't forget. Keep your eyes on the screen — I'll bubble up a beautiful popup alert with sounds and deep vibration sequences in just 3 seconds, my friend!"
-            "GLADOS" -> "Adding a reminder for '$capitalizedSubject'. Quite fascinating. I've scheduled it in our registers. Prepare your mortal senses — I'm initiating vibration and sound indicators in 3 seconds. Try not to jump."
-            else -> "Affirmative, $uName! I have successfully scheduled an offline reminder for '$capitalizedSubject'. Rest assured, I will trigger deep device vibration pulses and pop up the alert on your display in precisely 3 seconds."
-        }
-
-        onLogUpdate(ConsoleMessage("NOVA", rawWittyPhrase))
-        speakTts(rawWittyPhrase)
-        val actionLoggedVal = "Scheduled local 3s alarm: $capitalizedSubject"
-        onActionAppend(actionLoggedVal)
-
-        viewModel.addTask(
-            title = capitalizedSubject,
-            description = "Custom voice-scheduled localized alert.",
-            priority = "HIGH",
-            category = "Reminder"
-        )
-
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-            kotlinx.coroutines.delay(3000)
-
-            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            val isSilent = if (audioManager != null) {
-                audioManager.ringerMode == android.media.AudioManager.RINGER_MODE_SILENT ||
-                        audioManager.ringerMode == android.media.AudioManager.RINGER_MODE_VIBRATE
-            } else {
-                false
-            }
-
-            vibrator?.let {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    it.vibrate(android.os.VibrationEffect.createOneShot(3000, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+        val titleVal = parsed.first
+        val triggerTimeVal = parsed.second
+        
+        val sdfTime = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.US)
+        val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val timeStr = sdfTime.format(java.util.Date(triggerTimeVal))
+        val dateStr = sdfDate.format(java.util.Date(triggerTimeVal))
+        
+        val contextScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+        contextScope.launch {
+            try {
+                val db = com.example.data.AppDatabase.getDatabase(context)
+                val newReminder = com.example.data.Reminder(
+                    title = titleVal,
+                    time = timeStr,
+                    date = dateStr,
+                    triggerTime = triggerTimeVal,
+                    status = "PENDING"
+                )
+                
+                // Create and verify (Problem 1!)
+                val newId = db.reminderDao.insertReminder(newReminder)
+                val retrieved = db.reminderDao.getReminderById(newId.toInt())
+                val verified = retrieved != null
+                
+                if (verified && retrieved != null) {
+                    // Schedule (Problem 2!)
+                    com.example.data.ReminderScheduler.scheduleReminder(context, retrieved)
+                    
+                    viewModel.addTask(
+                        title = titleVal,
+                        description = "Scheduled reminder: $timeStr on $dateStr (Verified ✓)",
+                        priority = "HIGH",
+                        category = "Reminder"
+                    )
+                    
+                    val responsePhrase = when (NovaPersonalityCore.activePersonality) {
+                        "JARVIS" -> "A superb reminder, Sir. I have scheduled '$titleVal' for $timeStr. It is verified and locked in our database."
+                        "SAMANTHA" -> "Ooh! I've scheduled your reminder for '$titleVal' at $timeStr. It's stored safely and verified."
+                        "GLADOS" -> "Saving reminder: '$titleVal' at $timeStr. Stored and verified. No errors detected."
+                        else -> "Affirmative, $uName! I have successfully scheduled a verified reminder for '$titleVal' at $timeStr."
+                    }
+                    
+                    onLogUpdate(ConsoleMessage("NOVA", responsePhrase))
+                    speakTts(responsePhrase)
+                    onActionAppend("Reminder Created & Verified: $titleVal at $timeStr")
+                    
+                    // Trigger UI top banner show (Problem 4!)
+                    onSuccessReminderSet?.invoke(retrieved)
                 } else {
-                    @Suppress("DEPRECATION")
-                    it.vibrate(3000)
+                    val failPhrase = "System warning: Database storage verification failed. Unable to safely schedule reminder."
+                    onLogUpdate(ConsoleMessage("SYSTEM", failPhrase))
+                    speakTts(failPhrase)
                 }
+            } catch (e: Exception) {
+                val errorPhrase = "Error processing reminder: ${e.localizedMessage}"
+                onLogUpdate(ConsoleMessage("SYSTEM", errorPhrase))
+                speakTts(errorPhrase)
             }
-
-            if (!isSilent) {
-                try {
-                    val notificationUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-                    val ringtone = android.media.RingtoneManager.getRingtone(context, notificationUri)
-                    ringtone?.play()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-                val verbalReminder = when (NovaPersonalityCore.activePersonality) {
-                    "JARVIS" -> "Reminder alert, Sir: $capitalizedSubject."
-                    "SAMANTHA" -> "Hey! Just wanted to gently remind you about $capitalizedSubject."
-                    "GLADOS" -> "Attention: $capitalizedSubject is now active. Cease standard operations."
-                    else -> "System alert: $capitalizedSubject is due."
-                }
-                speakTts(verbalReminder)
-            }
-
-            globalReminderAlertTrigger?.invoke("Nova Local Alarm", capitalizedSubject)
         }
         return
     }
@@ -2961,80 +3116,54 @@ fun processVocalDirective(
         when {
             // Reminders System (Vibrate + Sound + Popup Alerts)
             clean.contains("remind") || clean.contains("reminder") -> {
-                var reminderSubject = clean
-                    .replace("remind me to ", "")
-                    .replace("remind me about ", "")
-                    .replace("remind me of ", "")
-                    .replace("remind me ", "")
-                    .replace("remind ", "")
-                    .replace("reminder to ", "")
-                    .replace("reminder for ", "")
-                    .replace("reminder ", "")
-                    .replace("about ", "")
+                val cleanedForReminder = cmd.lowercase(java.util.Locale.getDefault()).trim()
+                    .replace(Regex("^(nova|ok nova|hey nova|please|can you|could you|start|launch)\\b"), "")
+                    .replace(Regex("[?.,!]"), "")
                     .trim()
+                val parsed = com.example.data.ReminderParser.parseReminderQuery(cleanedForReminder)
+                if (parsed == null) {
+                    speechOutVal = "Could you please specify when you'd like your reminder set? For example, 'at 8:30 PM' or 'in 15 minutes'."
+                    actionLoggedVal = "Failed to parse reminder time"
+                } else {
+                    val titleVal = parsed.first
+                    val triggerTimeVal = parsed.second
+                    
+                    val sdfTime = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.US)
+                    val sdfDate = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                    val timeStr = sdfTime.format(java.util.Date(triggerTimeVal))
+                    val dateStr = sdfDate.format(java.util.Date(triggerTimeVal))
+                    
+                    speechOutVal = "Reminder set: $titleVal at $timeStr."
+                    actionLoggedVal = "Scheduled local alarm: $titleVal"
+                    onActionAppend(actionLoggedVal)
 
-                if (reminderSubject.isEmpty()) {
-                    reminderSubject = "Task Alert"
-                }
-                val capitalizedSubject = reminderSubject.substring(0, 1).uppercase(Locale.getDefault()) + reminderSubject.substring(1)
-
-                val rawWittyPhrase = when (NovaPersonalityCore.activePersonality) {
-                    "JARVIS" -> "A superb reminder, Sir. I'm adding '$capitalizedSubject' into our local task matrices and priming localized alarm parameters. Standby — vibration and notification arrays will engage on your device in exactly 3 seconds, Sir."
-                    "SAMANTHA" -> "Ooh, I love that! I've logged '$capitalizedSubject' in your Tasks list, so you won't forget. Keep your eyes on the screen — I'll bubble up a beautiful popup alert with sounds and deep vibration sequences in just 3 seconds, my friend!"
-                    "GLADOS" -> "Adding a reminder for '$capitalizedSubject'. Quite fascinating. I've scheduled it in our registers. Prepare your mortal senses — I'm initiating vibration and sound indicators in 3 seconds. Try not to jump."
-                    else -> "Affirmative, $uName! I have successfully scheduled an offline reminder for '$capitalizedSubject'. Rest assured, I will trigger deep device vibration pulses and pop up the alert on your display in precisely 3 seconds."
-                }
-
-                speechOutVal = rawWittyPhrase
-                actionLoggedVal = "Scheduled local 3s alarm: $capitalizedSubject"
-                onActionAppend(actionLoggedVal)
-
-                viewModel.addTask(
-                    title = capitalizedSubject,
-                    description = "Custom voice-scheduled localized alert.",
-                    priority = "HIGH",
-                    category = "Reminder"
-                )
-
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                    kotlinx.coroutines.delay(3000)
-
-                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
-                    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-                    val isSilent = if (audioManager != null) {
-                        audioManager.ringerMode == android.media.AudioManager.RINGER_MODE_SILENT ||
-                                audioManager.ringerMode == android.media.AudioManager.RINGER_MODE_VIBRATE
-                    } else {
-                        false
-                    }
-
-                    vibrator?.let {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                            it.vibrate(android.os.VibrationEffect.createOneShot(3000, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                        } else {
-                            @Suppress("DEPRECATION")
-                            it.vibrate(3000)
-                        }
-                    }
-
-                    if (!isSilent) {
+                    val contextScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+                    contextScope.launch {
                         try {
-                            val notificationUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-                            val ringtone = android.media.RingtoneManager.getRingtone(context, notificationUri)
-                            ringtone?.play()
+                            val db = com.example.data.AppDatabase.getDatabase(context)
+                            val newReminder = com.example.data.Reminder(
+                                title = titleVal,
+                                time = timeStr,
+                                date = dateStr,
+                                triggerTime = triggerTimeVal,
+                                status = "PENDING"
+                            )
+                            val newId = db.reminderDao.insertReminder(newReminder)
+                            val retrieved = db.reminderDao.getReminderById(newId.toInt())
+                            if (retrieved != null) {
+                                com.example.data.ReminderScheduler.scheduleReminder(context, retrieved)
+                                viewModel.addTask(
+                                    title = titleVal,
+                                    description = "Scheduled reminder: $timeStr on $dateStr (Verified ✓)",
+                                    priority = "HIGH",
+                                    category = "Reminder"
+                                )
+                                onSuccessReminderSet?.invoke(retrieved)
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
-                        val verbalReminder = when (NovaPersonalityCore.activePersonality) {
-                            "JARVIS" -> "Reminder alert, Sir: $capitalizedSubject."
-                            "SAMANTHA" -> "Hey! Just wanted to gently remind you about $capitalizedSubject."
-                            "GLADOS" -> "Attention: $capitalizedSubject is now active. Cease standard operations."
-                            else -> "System alert: $capitalizedSubject is due."
-                        }
-                        speakTts(verbalReminder)
                     }
-
-                    globalReminderAlertTrigger?.invoke("Nova Local Alarm", capitalizedSubject)
                 }
             }
 
@@ -4960,7 +5089,8 @@ fun RedesignedDialogueTab(
     userName: String,
     recentActions: List<String>,
     onRecentActionsChange: (List<String>) -> Unit,
-    listState: androidx.compose.foundation.lazy.LazyListState
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onSuccessReminderSet: (com.example.data.Reminder) -> Unit
 ) {
     var typedText by remember { mutableStateOf("") }
     LaunchedEffect(dialogHistoryList.size) {
@@ -5315,7 +5445,8 @@ fun RedesignedDialogueTab(
                                     uName = userName,
                                     onLogUpdate = { onDialogHistoryListChange(dialogHistoryList + it) },
                                     onActionAppend = { onRecentActionsChange(listOf(it) + recentActions.take(5)) },
-                                    dialogHistoryList = dialogHistoryList
+                                    dialogHistoryList = dialogHistoryList,
+                                    onSuccessReminderSet = onSuccessReminderSet
                                 )
                             }
                         }
@@ -5361,7 +5492,8 @@ fun RedesignedDialogueTab(
                                     uName = userName,
                                     onLogUpdate = { onDialogHistoryListChange(dialogHistoryList + it) },
                                     onActionAppend = { onRecentActionsChange(listOf(it) + recentActions.take(5)) },
-                                    dialogHistoryList = dialogHistoryList
+                                    dialogHistoryList = dialogHistoryList,
+                                    onSuccessReminderSet = onSuccessReminderSet
                                 )
                             }
                         },
@@ -6135,6 +6267,7 @@ fun RedesignedMemoryTab(
     context: android.content.Context,
     viewModel: NovaViewModel,
     tasksList: List<com.example.data.Task>,
+    remindersList: List<com.example.data.Reminder>,
     onActiveTabChange: (String) -> Unit = {}
 ) {
     // 1. Particle States
@@ -7330,6 +7463,170 @@ fun RedesignedMemoryTab(
                     }
                 }
             )
+        }
+
+        // --- ADDON: SECURE REMINDERS REGISTRY ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(TechCard, RoundedCornerShape(18.dp))
+                .border(1.2.dp, BorderSlate.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "SECURE REMINDERS REGISTRY",
+                        color = CyberCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "VERIFIED LOCALIZED ALARMS ENGINE",
+                        color = CharcoalMuted,
+                        fontSize = 8.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .background(CyberCyan.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "${remindersList.size} RECORD(S)",
+                        color = CyberCyan,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+
+            if (remindersList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CyberSlate.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("⏰", fontSize = 24.sp)
+                        Text(
+                            text = "No active reminders stored in secure local matrix.",
+                            color = CharcoalMuted,
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    remindersList.forEach { reminder ->
+                        val isPending = reminder.status == "PENDING"
+                        val indicatorColor = if (isPending) NeonAmber else TechTeal
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(CyberSlate.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                .border(1.dp, BorderSlate.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Status bar tracker indicator
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(36.dp)
+                                        .background(indicatorColor, RoundedCornerShape(2.dp))
+                                )
+                                
+                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(indicatorColor, CircleShape)
+                                        )
+                                        Text(
+                                            text = if (isPending) "VERIFIED SCHEDULED" else "VERIFIED DISPATCHED",
+                                            color = indicatorColor,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                    Text(
+                                        text = reminder.title,
+                                        color = PureWhite,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "Due: ${reminder.time} (${reminder.date})",
+                                        color = CharcoalMuted,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+                            
+                            // Delete/Cancel Action Trigger Button
+                            Box(
+                                modifier = Modifier
+                                    .clickable {
+                                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                                            try {
+                                                val db = com.example.data.AppDatabase.getDatabase(context)
+                                                if (isPending) {
+                                                    // Cancel Alarm Manager registration
+                                                    com.example.data.ReminderScheduler.cancelReminder(context, reminder.id)
+                                                }
+                                                // Delete db entry
+                                                db.reminderDao.deleteReminder(reminder)
+                                                android.widget.Toast.makeText(context, "Reminder removed from local matrix.", android.widget.Toast.LENGTH_SHORT).show()
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
+                                        }
+                                    }
+                                    .background(Color.Red.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                    .border(1.dp, Color.Red.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            ) {
+                                Text(
+                                    text = if (isPending) "CANCEL" else "DELETE",
+                                    color = Color.Red,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(100.dp))

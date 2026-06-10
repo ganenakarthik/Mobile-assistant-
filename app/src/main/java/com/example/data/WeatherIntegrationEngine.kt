@@ -41,6 +41,19 @@ object WeatherIntegrationEngine {
                     }
                 }
 
+                if (cityName.isEmpty() && cleanQuery.contains("weather")) {
+                    val parts = cleanQuery.split("weather")
+                    val leftPart = parts[0].replace(Regex("\\b(search|check|for|the|get|show|what is|whats)\\b"), "").replace("?", "").replace(".", "").trim()
+                    if (leftPart.isNotEmpty()) {
+                        cityName = leftPart
+                    } else if (parts.size > 1) {
+                        val rightPart = parts[1].replace(Regex("\\b(and|save|to|notes|notepad|it|for|in|from)\\b"), "").replace("?", "").replace(".", "").trim()
+                        if (rightPart.isNotEmpty()) {
+                            cityName = rightPart
+                        }
+                    }
+                }
+
                 var lat = 37.7749 // Default SF
                 var lon = -122.4194
                 var finalCityLabel = "San Francisco"
