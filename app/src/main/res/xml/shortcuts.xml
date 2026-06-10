@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="vocal_assist"
+        android:enabled="true"
+        android:icon="@drawable/ic_mic_nova"
+        android:shortcutShortLabel="@string/shortcut_assist"
+        android:shortcutLongLabel="@string/shortcut_long_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example"
+            android:targetClass="com.example.AssistActivity" />
+    </shortcut>
+</shortcuts>

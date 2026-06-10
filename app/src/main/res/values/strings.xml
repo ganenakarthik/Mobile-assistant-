@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Nova</string>
+    <string name="shortcut_assist">Talk to Nova</string>
+    <string name="shortcut_long_label">Vocal Directive Bridge</string>
+</resources>

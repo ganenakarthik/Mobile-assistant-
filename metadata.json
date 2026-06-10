@@ -1,0 +1,6 @@
+{
+  "name": "Nova",
+  "description": "A premium, fully offline voice-activated intelligent AI companion.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
