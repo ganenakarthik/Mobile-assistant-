@@ -22,6 +22,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -294,6 +295,7 @@ fun VoiceAssistantPanel(
 
     val isAutomating by com.example.AutomationEngine.isAutomating.collectAsState()
     val automationSteps by com.example.AutomationEngine.currentSteps.collectAsState()
+    val currentPlan by com.example.AutomationEngine.currentPlan.collectAsState()
     val automationLogs by com.example.AutomationEngine.executionLogs.collectAsState()
     val currentIntent by com.example.AutomationEngine.currentIntent.collectAsState()
 
@@ -1124,6 +1126,48 @@ fun VoiceAssistantPanel(
                                     )
                                     Text(
                                         text = "🔍 VERIFICATION: ${intentInfo.verification}",
+                                        color = SageGreen,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                                Divider(color = BorderSlate.copy(alpha = 0.15f))
+                            }
+
+                            currentPlan?.let { plan ->
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(BorderSlate.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "📋 PLANNER GOAL: ${plan.goal.uppercase(Locale.ROOT)}",
+                                        color = CyberCyan,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "🚦 STATUS: ${plan.status}",
+                                        color = when (plan.status) {
+                                            "SUCCESS" -> SageGreen
+                                            "FAILED" -> GlowingRed
+                                            else -> CyberCyan
+                                        },
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "📍 CURRENT STEP: ${if (plan.steps.isNotEmpty()) plan.steps.getOrNull(plan.currentStep)?.description ?: "None" else "None"}",
+                                        color = PureWhite,
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                    Text(
+                                        text = "✅ COMPLETED: ${plan.completedSteps.size} of ${plan.steps.size}",
                                         color = SageGreen,
                                         fontSize = 10.sp,
                                         fontFamily = FontFamily.Monospace
@@ -2332,6 +2376,17 @@ fun NovaCinematicEnergyOrb(
     isSpeaking: Boolean,
     floatParticles: List<DriftParticle>
 ) {
+    val liveState by com.example.data.NovaLifeSystem.liveState.collectAsState()
+    val liveMood by com.example.data.NovaLifeSystem.liveMood.collectAsState()
+
+    val effectiveListening = isListening || (liveState == com.example.data.NovaLifeSystem.CognitiveState.UNDERSTANDING)
+    val effectiveThinking = isThinking || (liveState == com.example.data.NovaLifeSystem.CognitiveState.THINKING || liveState == com.example.data.NovaLifeSystem.CognitiveState.SEARCHING || liveState == com.example.data.NovaLifeSystem.CognitiveState.VERIFYING)
+    val effectiveSpeaking = isSpeaking || (liveState == com.example.data.NovaLifeSystem.CognitiveState.SPEAKING)
+    val effectiveActing = (liveState == com.example.data.NovaLifeSystem.CognitiveState.ACTING)
+    val effectiveSuccess = (liveState == com.example.data.NovaLifeSystem.CognitiveState.SUCCESS)
+    val effectiveError = (liveState == com.example.data.NovaLifeSystem.CognitiveState.ERROR)
+    val effectiveRemembering = (liveState == com.example.data.NovaLifeSystem.CognitiveState.REMEMBERING)
+
     val infiniteTransition = rememberInfiniteTransition(label = "energy_orb")
 
     // Idle slow breath
@@ -2356,12 +2411,12 @@ fun NovaCinematicEnergyOrb(
         label = "rotation"
     )
 
-    // Speaking synchronized pulse amplitude
+    // Speaking synchronized pulse amplitude / Rapid pulse if in error
     val speakAmplitude by infiniteTransition.animateFloat(
         initialValue = 0.9f,
-        targetValue = 1.25f,
+        targetValue = if (effectiveError) 1.35f else 1.25f,
         animationSpec = infiniteRepeatable(
-            animation = tween(400, easing = FastOutSlowInEasing),
+            animation = tween(if (effectiveError) 200 else 400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "speak_amp"
@@ -2374,12 +2429,30 @@ fun NovaCinematicEnergyOrb(
                 val center = Offset(size.width / 2f, size.height / 2f)
                 val baseRadius = size.minDimension / 2.8f
                 
-                // Color mapping: standard luxurious Apple gradients
+                val OrangeGold = Color(0xFFFF9E00)
+                val RubyGold = Color(0xFFFF4D6D)
+                val CrimsonRust = Color(0xFFFF0054)
+                val ElectricSlate = Color(0xFF00FFCC)
+                val LavenderRose = Color(0xFFE040FB)
+                val EmeraldMist = Color(0xFF00E676)
+                val GoldSage = Color(0xFFFFEA00)
+                val IndigoViolet = Color(0xFF7F00FF)
+
                 val coreColor = when {
-                    isListening -> GlowingRed
-                    isThinking -> NeonAmber
-                    isSpeaking -> TechTeal // Soft purple
-                    else -> CyberCyan       // Electric blue inviting glow
+                    effectiveError -> GlowingRed
+                    effectiveSuccess -> SageGreen
+                    effectiveRemembering -> LavenderRose
+                    effectiveListening -> GlowingRed
+                    effectiveThinking -> GoldSage
+                    effectiveSpeaking -> TechTeal
+                    effectiveActing -> CrimsonRust
+                    else -> when (liveMood) {
+                        com.example.data.NovaLifeSystem.EmotionalMood.CALM -> CyberCyan
+                        com.example.data.NovaLifeSystem.EmotionalMood.FOCUS -> TechTeal
+                        com.example.data.NovaLifeSystem.EmotionalMood.CURIOUS -> IndigoViolet
+                        com.example.data.NovaLifeSystem.EmotionalMood.ALERT -> GlowingRed
+                        com.example.data.NovaLifeSystem.EmotionalMood.WARM -> OrangeGold
+                    }
                 }
 
                 // 1. Soft deep layered backdrop halo reflection glow
@@ -2398,18 +2471,15 @@ fun NovaCinematicEnergyOrb(
                 )
 
                 // 2. Liquid Glass physical outer sphere shell
-                // Soft diffuse inner shadow effect
                 drawCircle(
                     color = Color.White.copy(alpha = 0.03f),
                     radius = baseRadius * 1.25f
                 )
-                // Frosted outline rim representing the outer glass shell boundary
                 drawCircle(
                     color = Color.White.copy(alpha = 0.35f),
                     radius = baseRadius * 1.25f,
                     style = Stroke(width = 2.dp.toPx())
                 )
-                // Double high-contrast thin glass reflection contour ring
                 drawCircle(
                     color = Color.White.copy(alpha = 0.12f),
                     radius = baseRadius * 1.29f,
@@ -2427,14 +2497,14 @@ fun NovaCinematicEnergyOrb(
                     )
                 }
 
-                // 4. State-based neural resonance rings (inside the glass)
-                if (isThinking) {
+                // 4. State-based neural resonance rings
+                if (effectiveThinking) {
                     val loopCount = 4
                     for (i in 0 until loopCount) {
                         val ringRotate = thinkRotation * (if (i % 2 == 0) 1.2f else -1.5f)
                         val radiusDelta = baseRadius * (0.5f + i * 0.18f)
                         drawCircle(
-                            color = NeonAmber.copy(alpha = 0.5f - i * 0.12f),
+                            color = coreColor.copy(alpha = 0.5f - i * 0.12f),
                             radius = radiusDelta,
                             style = Stroke(
                                 width = 1.6.dp.toPx(),
@@ -2445,8 +2515,7 @@ fun NovaCinematicEnergyOrb(
                             )
                         )
                     }
-                } else if (isListening) {
-                    // Swift contracting high voltage radar waves
+                } else if (effectiveListening) {
                     drawCircle(
                         color = GlowingRed.copy(alpha = 0.4f),
                         radius = baseRadius * breathScale * 0.95f,
@@ -2457,8 +2526,7 @@ fun NovaCinematicEnergyOrb(
                         radius = baseRadius * breathScale * 1.15f,
                         style = Stroke(width = 1.2.dp.toPx())
                     )
-                } else if (isSpeaking) {
-                    // Resonating voice ripples
+                } else if (effectiveSpeaking) {
                     val rippleRadius = baseRadius * speakAmplitude * 0.9f
                     drawCircle(
                         color = TechTeal.copy(alpha = 0.5f),
@@ -2470,16 +2538,35 @@ fun NovaCinematicEnergyOrb(
                         radius = rippleRadius + 15.dp.toPx(),
                         style = Stroke(width = 1.2.dp.toPx())
                     )
-                } else {
-                    // Calm organic breathing idle orbit
+                } else if (effectiveActing) {
+                    val pulseRadius = baseRadius * (breathScale + 0.1f)
                     drawCircle(
-                        color = CyberCyan.copy(alpha = 0.35f),
+                        color = CrimsonRust.copy(alpha = 0.6f),
+                        radius = pulseRadius,
+                        style = Stroke(width = 3.dp.toPx())
+                    )
+                } else if (effectiveSuccess) {
+                    val pulseRadius = baseRadius * (breathScale + 0.2f)
+                    drawCircle(
+                        color = SageGreen.copy(alpha = 0.7f),
+                        radius = pulseRadius,
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                } else if (effectiveError) {
+                    drawCircle(
+                        color = GlowingRed.copy(alpha = 0.7f),
+                        radius = baseRadius * speakAmplitude,
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+                } else {
+                    drawCircle(
+                        color = coreColor.copy(alpha = 0.35f),
                         radius = baseRadius * breathScale * 0.85f,
                         style = Stroke(width = 1.8.dp.toPx())
                     )
                 }
 
-                // 5. Solid organic inner CORE sphere representing Nova's cognitive engine
+                // 5. Solid organic inner CORE sphere
                 val coreGlowShader = Brush.radialGradient(
                     colors = listOf(
                         coreColor,
@@ -2491,11 +2578,10 @@ fun NovaCinematicEnergyOrb(
                 )
                 drawCircle(
                     brush = coreGlowShader,
-                    radius = baseRadius * 0.7f * (if (isSpeaking) speakAmplitude else breathScale)
+                    radius = baseRadius * 0.7f * (if (effectiveSpeaking || effectiveError) speakAmplitude else breathScale)
                 )
 
-                // 6. Liquid Glass Gloss highlight refraction on the main outer sphere!
-                // Draws a realistic curved reflection shimmer on the upper-left of the glass sphere
+                // 6. Liquid Glass Gloss highlight refraction
                 val shimmerBrush = Brush.linearGradient(
                     colors = listOf(
                         Color.White.copy(alpha = 0.45f),
@@ -2641,10 +2727,264 @@ fun processVocalDirective(
 
     onLogUpdate(ConsoleMessage("USER", cmd))
 
-    val clean = cmd.lowercase(Locale.getDefault()).trim()
+    // --- REFERENCE RESOLUTION LAYER ---
+    val resolvedCmd = if (com.example.data.ConversationMemoryResolver.hasReferenceWords(cmd)) {
+        when (val res = com.example.data.ConversationMemoryResolver.resolve(cmd)) {
+            is com.example.data.ConversationMemoryResolver.Resolution.Resolved -> {
+                onLogUpdate(ConsoleMessage("SYSTEM", "Reference resolved auto-mapping: '${cmd}' -> '${res.query}'"))
+                res.query
+            }
+            is com.example.data.ConversationMemoryResolver.Resolution.Ambiguous -> {
+                onLogUpdate(ConsoleMessage("NOVA", res.prompt))
+                speakTts(res.prompt)
+                return
+            }
+        }
+    } else {
+        cmd
+    }
+
+    val clean = resolvedCmd.lowercase(Locale.getDefault()).trim()
         .replace(Regex("^(nova|ok nova|hey nova|please|can you|could you|start|launch)\\b"), "")
         .replace(Regex("[?:.,!]"), "")
         .trim()
+
+    // --- PENDING MESSAGE CONFIRMATION INTERCEPTOR ---
+    val isPendingMsgActive = com.example.AutomationEngine.pendingMessageRecipient.value != null
+    if (isPendingMsgActive) {
+        val appLower = clean.lowercase(Locale.getDefault())
+        if (appLower == "send" || appLower == "do it" || appLower == "yes" || appLower == "confirm" || appLower == "approve" || appLower == "ok" || clean.contains("send it") || clean.contains("do it")) {
+            com.example.AutomationEngine.messageApprovalStatus = true
+            onLogUpdate(ConsoleMessage("SYSTEM", "User approved pending message dispatch via voice/text."))
+            return
+        } else if (appLower == "discard" || appLower == "cancel" || appLower == "no" || appLower == "reject" || clean.contains("discard it") || clean.contains("cancel it")) {
+            com.example.AutomationEngine.messageApprovalStatus = false
+            onLogUpdate(ConsoleMessage("SYSTEM", "User discarded pending message dispatch via voice/text."))
+            return
+        }
+    }
+
+    // --- CONTEXT SAVING ENGINE ---
+    com.example.data.ConversationMemoryResolver.parseAndUpdateContext(clean, resolvedCmd)
+
+    // --- AUTOMATIC STATE-DRIVEN TASK MODE UPDATER ---
+    val cleanCmdLower = clean.lowercase(Locale.getDefault())
+    when {
+        cleanCmdLower == "standby" || cleanCmdLower == "standby mode" || cleanCmdLower == "reset mode" || cleanCmdLower == "reset active mode" || cleanCmdLower == "clear mode" -> {
+            com.example.data.NovaLifeSystem.updateActiveTaskMode(com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY, "User requested standby reset")
+        }
+        cleanCmdLower.contains("message") || cleanCmdLower.contains("whatsapp") || cleanCmdLower.contains("sms") || cleanCmdLower.contains("text to") || cleanCmdLower.contains("send text") || cleanCmdLower.startsWith("call ") || cleanCmdLower.startsWith("dial ") || cleanCmdLower.contains("tell ") || cleanCmdLower.contains("contact") -> {
+            com.example.data.NovaLifeSystem.updateActiveTaskMode(com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING, "Command mapped to secure messaging/telephony")
+        }
+        cleanCmdLower.contains("item") || cleanCmdLower.contains("stock") || cleanCmdLower.contains("quantity") || cleanCmdLower.contains("threshold") || cleanCmdLower.contains("inventory") || cleanCmdLower.contains("storage") || cleanCmdLower.contains("main vault") || cleanCmdLower.contains("main storage") || cleanCmdLower.contains("sales") || cleanCmdLower.contains("price tag") || cleanCmdLower.contains("product count") -> {
+            com.example.data.NovaLifeSystem.updateActiveTaskMode(com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING, "Command matched database inventory parameters")
+        }
+        cleanCmdLower.contains("score") || cleanCmdLower.contains("cricket") || cleanCmdLower.contains("match") || cleanCmdLower.contains("ipl") || cleanCmdLower.contains("runs") || cleanCmdLower.contains("wickets") || cleanCmdLower.contains("weather") || cleanCmdLower.contains("forecast") || cleanCmdLower.contains("temp") || cleanCmdLower.contains("temperature") || cleanCmdLower.contains("news") || cleanCmdLower.contains("search") || cleanCmdLower.contains("research") || cleanCmdLower.contains("browse") || cleanCmdLower.contains("scraper") || cleanCmdLower.startsWith("who is") || cleanCmdLower.startsWith("what is") || cleanCmdLower.startsWith("explain") || cleanCmdLower.contains("knowledge") || cleanCmdLower.contains("define") || cleanCmdLower.contains("why does") || cleanCmdLower.contains("how can i") -> {
+            com.example.data.NovaLifeSystem.updateActiveTaskMode(com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING, "Command triggers web Scraping & info query")
+        }
+    }
+
+    // --- CENTRAL BRAIN ROUTER PIPELINE (FIRST GATE) ---
+    val routed = com.example.data.BrainRouter.routeAndExecute(
+        cmd = resolvedCmd,
+        context = context,
+        viewModel = viewModel,
+        tasksList = tasksList,
+        itemsList = itemsList,
+        speakTts = speakTts,
+        uName = uName,
+        onLogUpdate = onLogUpdate,
+        onActionAppend = onActionAppend,
+        onWakeWordDetected = onWakeWordDetected,
+        dialogHistoryList = dialogHistoryList,
+        onSuccessReminderSet = onSuccessReminderSet,
+        onActiveTabChange = onActiveTabChange
+    )
+    if (routed) {
+        return
+    }
+
+    val activeCallContacts = com.example.AutomationEngine.pendingCallContacts.value
+    if (activeCallContacts.isNotEmpty()) {
+        val selLower = clean.lowercase(Locale.getDefault())
+        var selectedIndex: Int? = null
+        if (selLower.contains("first") || selLower == "1" || selLower.contains("number one") || selLower.contains("the first one") || selLower.contains("first one")) {
+            selectedIndex = 0
+        } else if (selLower.contains("second") || selLower == "2" || selLower.contains("the second one") || selLower.contains("number two") || selLower.contains("second one")) {
+            selectedIndex = 1
+        } else if (selLower.contains("third") || selLower == "3" || selLower.contains("the third one") || selLower.contains("number three") || selLower.contains("third one")) {
+            selectedIndex = 2
+        } else {
+            // Check if name matches any of the displayed contact's names
+            for (i in activeCallContacts.indices) {
+                val candidateName = activeCallContacts[i].first.lowercase(Locale.getDefault())
+                if (selLower.contains(candidateName) || candidateName.contains(selLower)) {
+                    selectedIndex = i
+                    break
+                }
+            }
+        }
+
+        if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < activeCallContacts.size) {
+            val chosen = activeCallContacts[selectedIndex]
+            com.example.AutomationEngine.callApprovalStatus = chosen
+            onLogUpdate(ConsoleMessage("SYSTEM", "User voice approved select candidate: ${chosen.first}"))
+            return
+        }
+    }
+
+    // --- 2.0 TEACH ONCE, USE FOREVER: ROUTINES SYSTEM INTERCEPTORS ---
+    val savedRoutines = viewModel.routinesStream.value
+
+    // Trigger check
+    val matchedRoutine = savedRoutines.find {
+        val tp = it.triggerPhrase.lowercase(Locale.getDefault()).trim()
+        clean == tp || clean == "run $tp" || clean == "start $tp" || clean == "execute $tp" || clean == "activate $tp" || clean == "turn on $tp" || clean == "enable $tp"
+    }
+
+    if (matchedRoutine != null) {
+        val actions = matchedRoutine.getActions()
+        if (actions.isNotEmpty()) {
+            val speechStr = "Activating routine: ${matchedRoutine.name}. Running ${actions.size} actions sequentially."
+            onLogUpdate(ConsoleMessage("NOVA", speechStr))
+            speakTts(speechStr)
+            onActionAppend("Executing routine: ${matchedRoutine.name}")
+            viewModel.recordRoutineUsage(matchedRoutine.id)
+
+            val combinedSteps = mutableListOf<com.example.AutomationStep>()
+            for (action in actions) {
+                val planned = com.example.AutomationEngine.planActions(action, context)
+                combinedSteps.addAll(planned)
+            }
+
+            if (combinedSteps.isNotEmpty()) {
+                com.example.AutomationEngine.runAutomation(
+                    context = context,
+                    plannedSteps = combinedSteps,
+                    viewModel = viewModel,
+                    speakNotification = { speech ->
+                        onLogUpdate(ConsoleMessage("NOVA", speech))
+                        speakTts(speech)
+                    }
+                )
+            } else {
+                val errStr = "I compiled the actions but found no executable steps."
+                onLogUpdate(ConsoleMessage("NOVA", errStr))
+                speakTts(errStr)
+            }
+        } else {
+            val errStr = "Routine '${matchedRoutine.name}' has no actions configured."
+            onLogUpdate(ConsoleMessage("NOVA", errStr))
+            speakTts(errStr)
+        }
+        return
+    }
+
+    // Teach / Remember routine command:
+    var isTeachMatch = false
+    var triggerPhraseVal = ""
+    var routineNameVal = ""
+    var actionsTextVal = ""
+
+    if (clean.startsWith("when i say ") || clean.contains("when i say ")) {
+        val whenIdx = clean.indexOf("when i say ")
+        isTeachMatch = true
+        val remain = clean.substring(whenIdx + 11).trim()
+        if (remain.contains(":")) {
+            val parts = remain.split(":", limit = 2)
+            triggerPhraseVal = parts[0].trim()
+            actionsTextVal = parts[1].trim()
+        } else {
+            val keywords = listOf("open", "turn", "set", "call", "message", "play", "do", "then")
+            var firstKeywordIdx = -1
+            for (kw in keywords) {
+                val regex = Regex("\\b$kw\\b")
+                val match = regex.find(remain)
+                if (match != null && match.range.first > 3) {
+                    if (firstKeywordIdx == -1 || match.range.first < firstKeywordIdx) {
+                        firstKeywordIdx = match.range.first
+                    }
+                }
+            }
+            if (firstKeywordIdx != -1) {
+                triggerPhraseVal = remain.substring(0, firstKeywordIdx).trim()
+                actionsTextVal = remain.substring(firstKeywordIdx).trim()
+            } else {
+                triggerPhraseVal = remain
+                actionsTextVal = ""
+            }
+        }
+        routineNameVal = triggerPhraseVal.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+    } else if (clean.contains("remember this routine") || clean.contains("remember this workflow") || clean.contains("teach this routine") || clean.contains("save this routine")) {
+        isTeachMatch = true
+        var remain = clean
+            .replace("remember this routine", "")
+            .replace("remember this workflow", "")
+            .replace("teach this routine", "")
+            .replace("save this routine", "")
+            .replace(":", "")
+            .trim()
+
+        if (remain.contains("saved as")) {
+            val parts = remain.split("saved as", limit = 2)
+            actionsTextVal = parts[0].trim()
+            triggerPhraseVal = parts[1].trim()
+        } else if (remain.contains("save as")) {
+            val parts = remain.split("save as", limit = 2)
+            actionsTextVal = parts[0].trim()
+            triggerPhraseVal = parts[1].trim()
+        } else if (remain.contains("as")) {
+            val parts = remain.split("as", limit = 2)
+            actionsTextVal = parts[0].trim()
+            triggerPhraseVal = parts[1].trim()
+        } else {
+            triggerPhraseVal = "Custom Routine"
+            actionsTextVal = remain
+        }
+        routineNameVal = triggerPhraseVal.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+    }
+
+    if (isTeachMatch) {
+         val delimiters = Regex("(?i)\\b(?:then|and then|and)\\b|[\\n;,-]")
+         val actionsList = actionsTextVal.split(delimiters)
+             .map { it.trim() }
+             .filter { it.isNotEmpty() }
+
+         if (actionsList.isEmpty() || triggerPhraseVal.isBlank()) {
+             val errResp = "I heard you want to teach me a workflow, but I couldn't identify the custom trigger phrase or the sequence of actions. Try saying: 'when I say study mode: turn on DND then open WhatsApp'."
+             speakTts(errResp)
+             onLogUpdate(ConsoleMessage("NOVA", errResp))
+         } else {
+             viewModel.insertRoutine(routineNameVal, triggerPhraseVal, actionsList)
+             val resp = "Successfully registered routine '$routineNameVal'. When you say '$triggerPhraseVal' in the future, I will trigger: ${actionsList.joinToString(", ")}."
+             speakTts(resp)
+             onLogUpdate(ConsoleMessage("NOVA", resp))
+             onActionAppend("Saved routine: $routineNameVal")
+         }
+         return
+    }
+
+    // Delete routine voice commands:
+    val isDeleteCommand = (clean.startsWith("delete ") || clean.startsWith("remove ")) &&
+            (clean.contains("routine") || savedRoutines.any { clean.contains(it.name.lowercase(Locale.getDefault())) || clean.contains(it.triggerPhrase.lowercase(Locale.getDefault())) })
+    if (isDeleteCommand) {
+        val targetStr = clean.removePrefix("delete ").removePrefix("remove ").replace("routine", "").trim()
+        val toDelete = savedRoutines.find {
+            it.name.lowercase(Locale.getDefault()) == targetStr || it.triggerPhrase.lowercase(Locale.getDefault()) == targetStr
+        }
+        if (toDelete != null) {
+            viewModel.deleteRoutine(toDelete.id)
+            val resp = "I have successfully deleted routine '${toDelete.name}' from your local index files."
+            speakTts(resp)
+            onLogUpdate(ConsoleMessage("NOVA", resp))
+            onActionAppend("Deleted routine via voice")
+        } else {
+            val resp = "I couldn't locate a routine matching '$targetStr'."
+            speakTts(resp)
+            onLogUpdate(ConsoleMessage("NOVA", resp))
+        }
+        return
+    }
 
     // 2.6b BACKGROUND BROWSER AGENT INTERCEPTS (Scrape searches, Scores, Downloads & Notepad integrations)
     if (clean.contains("free api") || clean.contains("api ai list") || clean.contains("api list")) {
@@ -2667,14 +3007,20 @@ fun processVocalDirective(
     }
 
     val isSportsDirectMatch = clean.contains("score") || clean.contains("cricket") || clean.contains("football") || clean.contains("match") || clean.contains("runs") || clean.contains("wickets") || clean.contains("ind vs pak") || clean.contains("india vs pakistan")
-    val isSportsFollowUp = lastTopicWasSports && (clean.contains("live") || clean.contains("stream") || clean.contains("who is winning") || clean.contains("status") || clean.contains("is it"))
+    val isSportsFollowUp = lastTopicWasSports && (clean.contains("live") || clean.contains("stream") || clean.contains("who is winning") || clean.contains("status") || clean.contains("is it") || clean.contains("another") || clean.contains("next") || clean.contains("not that"))
 
     if (isSportsDirectMatch || isSportsFollowUp) {
         lastTopicWasSports = true
-        val scoresText = "According to the real-time background scrapers of Nova Browser: India is playing Pakistan in the ICC Men's tournament. Pakistan is currently at 142 for 6 in 18.2 overs, chasing a target of 160. The match is extremely active and close."
-        speakTts(scoresText)
-        onLogUpdate(ConsoleMessage("NOVA", scoresText))
-        onActionAppend("Scraped live match feed in background browser")
+        onActiveTabChange("DIALOGUE")
+        com.example.data.LiveInformationEngine.queryLiveInformation(
+            query = resolvedCmd,
+            context = context,
+            onResult = { result ->
+                speakTts(result)
+                onLogUpdate(ConsoleMessage("NOVA", result))
+                onActionAppend("Scraped live match feed in background browser")
+            }
+        )
         return
     }
 
@@ -2798,11 +3144,37 @@ fun processVocalDirective(
         
         if (isWifi) {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            var success = false
             try {
                 @Suppress("DEPRECATION")
-                wifiManager?.isWifiEnabled = targetState
+                success = wifiManager?.setWifiEnabled(targetState) == true
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+            
+            // Modern Android (API 29+) prevents programmatic toggles for non-system apps. Launch system panel or settings.
+            if (!success) {
+                try {
+                    val intent = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                        Intent(android.provider.Settings.Panel.ACTION_WIFI).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                    } else {
+                        Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_WIFI_SETTINGS).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    } catch (ex: Exception) {
+                        ex.printStackTrace()
+                    }
+                }
             }
             
             val response = when (NovaPersonalityCore.activePersonality) {
@@ -2830,13 +3202,40 @@ fun processVocalDirective(
             try {
                 if (targetState) {
                     @Suppress("DEPRECATION")
-                    bluetoothAdapter?.enable()
+                    val success = bluetoothAdapter?.enable()
+                    if (success != true) {
+                        try {
+                            val intent = android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE).apply {
+                                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            val intent = android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                        }
+                    }
                 } else {
                     @Suppress("DEPRECATION")
-                    bluetoothAdapter?.disable()
+                    val success = bluetoothAdapter?.disable()
+                    if (success != true) {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS).apply {
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                } catch (ex: Exception) {
+                    ex.printStackTrace()
+                }
             }
             
             val response = when (NovaPersonalityCore.activePersonality) {
@@ -2853,29 +3252,44 @@ fun processVocalDirective(
     }
 
     // 2.9 Intercept quick notes and brain dump saving
-    if (clean.startsWith("note this ") || clean.startsWith("save note ") || clean.startsWith("brain dump ")) {
+    if (clean.startsWith("note this ") || clean.startsWith("save note ") || clean.startsWith("brain dump ") || clean.startsWith("save to notes ")) {
         val noteContent = clean
             .replace("note this ", "")
             .replace("save note ", "")
             .replace("brain dump ", "")
+            .replace("save to notes ", "")
             .trim()
         if (noteContent.isNotEmpty()) {
             val formatted = noteContent.substring(0, 1).uppercase(Locale.getDefault()) + noteContent.substring(1)
-            val response = when (NovaPersonalityCore.activePersonality) {
-                "JARVIS" -> "Note added to databanks successfully, Sir: '$formatted'."
-                "SAMANTHA" -> "I've saved this quick note for you: '$formatted'. It's safe in your memory vault."
-                "GLADOS" -> "Logged note: '$formatted'. Your memory buffer is obviously insufficient to handle this."
-                else -> "Affirmative! Quick note saved to memory vault: '$formatted'."
+            val contextScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+            contextScope.launch {
+                try {
+                    val db = com.example.data.AppDatabase.getDatabase(context)
+                    val noteTask = com.example.data.Task(
+                        title = formatted,
+                        description = "Quick brain dump",
+                        priority = "MEDIUM",
+                        category = "Note",
+                        status = "PENDING"
+                    )
+                    val insertedId = db.taskDao.insertTask(noteTask)
+                    val retrievedNote = db.taskDao.getTaskById(insertedId.toInt())
+                    if (retrievedNote != null) {
+                        val response = "Saved to notes"
+                        speakTts(response)
+                        onLogUpdate(ConsoleMessage("NOVA", response))
+                        onActionAppend("Saved brain note: ${retrievedNote.title}")
+                    } else {
+                        val response = "Note save failed."
+                        speakTts(response)
+                        onLogUpdate(ConsoleMessage("NOVA", response))
+                    }
+                } catch (e: Exception) {
+                    val response = "Note save failed due to database error."
+                    speakTts(response)
+                    onLogUpdate(ConsoleMessage("SYSTEM", "Error saving note: ${e.message}"))
+                }
             }
-            speakTts(response)
-            onLogUpdate(ConsoleMessage("NOVA", response))
-            onActionAppend("Saved brain note")
-            viewModel.addTask(
-                title = formatted,
-                description = "Quick brain dump",
-                priority = "MEDIUM",
-                category = "Note"
-            )
         } else {
             val response = "Please specify a message or task to note down."
             speakTts(response)
@@ -2930,6 +3344,90 @@ fun processVocalDirective(
     }
 
     // 2.5 Intercept free weather telemetry requests
+    val isSearchToNotes = (clean.contains("weather") || clean.contains("forecast") || clean.contains("temperature in") || clean.contains("temperature of")) &&
+            (clean.contains("note") || clean.contains("notes") || clean.contains("notepad") || clean.contains("keep") || clean.contains("save"))
+
+    if (isSearchToNotes) {
+        onLogUpdate(ConsoleMessage("SYSTEM", "Pipeline Step 1: Initializing Task Context & Querying atmospheric telemetry servers..."))
+
+        // Create the task context to store search-to-notes metrics
+        val taskContext = com.example.data.TaskContext(
+            originalCommand = resolvedCmd,
+            targetApp = "Notes"
+        )
+        com.example.data.TaskContextHolder.activeContext = taskContext
+
+        com.example.data.WeatherIntegrationEngine.fetchWeather(
+            context = context,
+            query = clean,
+            onResult = { resultText, telemetry ->
+                // Step 1 Output
+                taskContext.searchResult = resultText
+                val city = telemetry?.get("city") ?: "Local"
+                taskContext.extractedData = "City: $city"
+                taskContext.noteTitle = "$city Weather"
+
+                val currentFormat = java.text.SimpleDateFormat("hh:mm a, yyyy-MM-dd", java.util.Locale.US)
+                taskContext.noteBody = """
+                    Temperature: ${telemetry?.get("temp") ?: "N/A"}°C
+                    Condition: ${telemetry?.get("condition") ?: "N/A"}
+                    Humidity: ${telemetry?.get("humidity") ?: "N/A"}%
+                    Updated: ${currentFormat.format(java.util.Date())}
+                    Source: Open-Meteo API (Nova Scraper)
+                """.trimIndent()
+
+                onLogUpdate(ConsoleMessage("NOVA", resultText))
+                speakTts("Retrieved telemetry for $city. Step 2: Opening Notes/Keep and pasting results.")
+
+                // Launch main scope for flow navigation stability and database insertions
+                val mainScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+                mainScope.launch {
+                    try {
+                        onLogUpdate(ConsoleMessage("SYSTEM", "Pipeline Step 2: Opening Notes/Keep..."))
+                        // Visual transit
+                        onActiveTabChange("MEMORY")
+                        kotlinx.coroutines.delay(1000)
+
+                        onLogUpdate(ConsoleMessage("SYSTEM", "Pipeline Step 3: Pasting note content and saving..."))
+                        val db = com.example.data.AppDatabase.getDatabase(context)
+                        val noteTask = com.example.data.Task(
+                            title = taskContext.noteTitle,
+                            description = taskContext.noteBody,
+                            priority = "MEDIUM",
+                            status = "PENDING",
+                            category = "Note"
+                        )
+                        val insertedId = db.taskDao.insertTask(noteTask)
+
+                        kotlinx.coroutines.delay(800)
+
+                        onLogUpdate(ConsoleMessage("SYSTEM", "Pipeline Step 4: Verifying note persistence matches records..."))
+                        val retrievedNote = db.taskDao.getTaskById(insertedId.toInt())
+                        if (retrievedNote != null) {
+                            onLogUpdate(ConsoleMessage("SYSTEM", "PASS: Verified note exists in database [ID: ${retrievedNote.id}] with Title: '${retrievedNote.title}'"))
+                            val confirmation = "Saved to notes"
+                            onLogUpdate(ConsoleMessage("NOVA", confirmation))
+                            speakTts(confirmation)
+                            onActionAppend("Saved weather to note: ${retrievedNote.title}")
+                        } else {
+                            onLogUpdate(ConsoleMessage("SYSTEM", "FAIL: Validation check failed to locate recently saved note in database."))
+                        }
+                    } catch (e: Exception) {
+                        onLogUpdate(ConsoleMessage("SYSTEM", "Execution error in note pipeline: ${e.message}"))
+                        e.printStackTrace()
+                    }
+                }
+            },
+            onError = { err ->
+                onLogUpdate(ConsoleMessage("SYSTEM", "Sensor connection failure during pipeline Step 1: $err"))
+                val fallbackText = "Atmospheric data feeds currently offline."
+                onLogUpdate(ConsoleMessage("NOVA", fallbackText))
+                speakTts(fallbackText)
+            }
+        )
+        return
+    }
+
     if (clean.contains("weather") || clean.contains("forecast") || clean.contains("temperature in") || clean.contains("temperature of")) {
         onLogUpdate(ConsoleMessage("SYSTEM", "Querying atmospheric telemetry servers..."))
         com.example.data.WeatherIntegrationEngine.fetchWeather(
@@ -2953,7 +3451,7 @@ fun processVocalDirective(
 
     // OFFLINE REMINDERS PRIORITY INTERCEPT (Prevents misleading automation/simulation hijacks)
     if (clean.contains("remind") || clean.contains("reminder")) {
-        val cleanedForReminder = cmd.lowercase(java.util.Locale.getDefault()).trim()
+        val cleanedForReminder = resolvedCmd.lowercase(java.util.Locale.getDefault()).trim()
             .replace(Regex("^(nova|ok nova|hey nova|please|can you|could you|start|launch)\\b"), "")
             .replace(Regex("[?.,!]"), "")
             .trim()
@@ -3000,13 +3498,7 @@ fun processVocalDirective(
                         category = "Reminder"
                     )
                     
-                    val responsePhrase = when (NovaPersonalityCore.activePersonality) {
-                        "JARVIS" -> "A superb reminder, Sir. I have scheduled '$titleVal' for $timeStr. It is verified and locked in our database."
-                        "SAMANTHA" -> "Ooh! I've scheduled your reminder for '$titleVal' at $timeStr. It's stored safely and verified."
-                        "GLADOS" -> "Saving reminder: '$titleVal' at $timeStr. Stored and verified. No errors detected."
-                        else -> "Affirmative, $uName! I have successfully scheduled a verified reminder for '$titleVal' at $timeStr."
-                    }
-                    
+                    val responsePhrase = "Reminder set"
                     onLogUpdate(ConsoleMessage("NOVA", responsePhrase))
                     speakTts(responsePhrase)
                     onActionAppend("Reminder Created & Verified: $titleVal at $timeStr")
@@ -3027,8 +3519,10 @@ fun processVocalDirective(
         return
     }
 
-    // DETECT AUTOMATION INTENT (Action Planner Override)
-    val plannedSteps = com.example.AutomationEngine.planActions(clean, context)
+    // ALWAYS CREATE A PLAN FIRST (Planner Engine Pipeline)
+    val taskPlan = com.example.data.PlannerEngine.createPlan(resolvedCmd, context)
+    com.example.AutomationEngine.setCurrentPlan(taskPlan)
+    val plannedSteps = taskPlan.steps
     val hasAutomationIntent = plannedSteps.isNotEmpty()
 
     if (hasAutomationIntent && plannedSteps.isNotEmpty()) {
@@ -3116,7 +3610,7 @@ fun processVocalDirective(
         when {
             // Reminders System (Vibrate + Sound + Popup Alerts)
             clean.contains("remind") || clean.contains("reminder") -> {
-                val cleanedForReminder = cmd.lowercase(java.util.Locale.getDefault()).trim()
+                val cleanedForReminder = resolvedCmd.lowercase(java.util.Locale.getDefault()).trim()
                     .replace(Regex("^(nova|ok nova|hey nova|please|can you|could you|start|launch)\\b"), "")
                     .replace(Regex("[?.,!]"), "")
                     .trim()
@@ -3383,7 +3877,7 @@ fun processVocalDirective(
                 onLogUpdate(ConsoleMessage("SYSTEM", "Querying Groq AI ($currentModel)..."))
                 com.example.data.GroqCognitionEngine.queryGroqAI(
                     context = context,
-                    prompt = cmd,
+                    prompt = resolvedCmd,
                     dialogHistoryList = dialogHistoryList,
                     onSuccess = { response ->
                         onLogUpdate(ConsoleMessage("NOVA", response))
@@ -3404,7 +3898,7 @@ fun processVocalDirective(
                 onLogUpdate(ConsoleMessage("SYSTEM", "Querying Google Gemini (gemini-3.5-flash)..."))
                 com.example.data.GeminiCognitionEngine.queryGeminiAI(
                     context = context,
-                    prompt = cmd,
+                    prompt = resolvedCmd,
                     dialogHistoryList = dialogHistoryList,
                     onSuccess = { response ->
                         onLogUpdate(ConsoleMessage("NOVA", response))
@@ -3432,7 +3926,7 @@ fun processVocalDirective(
                 onLogUpdate(ConsoleMessage("SYSTEM", "Querying Free A.I. Core ($provider - $model)..."))
                 com.example.data.FreeMultiCognitionEngine.queryFreeAI(
                     context = context,
-                    prompt = cmd,
+                    prompt = resolvedCmd,
                     dialogHistoryList = dialogHistoryList,
                     onSuccess = { response ->
                         onLogUpdate(ConsoleMessage("NOVA", response))
@@ -3440,7 +3934,7 @@ fun processVocalDirective(
                     },
                     onError = { error ->
                         onLogUpdate(ConsoleMessage("SYSTEM", "Free AI Gateway Error: $error. Falling back..."))
-                        speechOutVal = "I have received and processed your command: '$cmd'."
+                        speechOutVal = "I have received and processed your command: '$resolvedCmd'."
                         actionLoggedVal = "Processed local fallback"
                         onActionAppend(actionLoggedVal)
                         onLogUpdate(ConsoleMessage("NOVA", speechOutVal))
@@ -4708,6 +5202,116 @@ fun RedesignedOrbTab(
             }
         }
 
+        // --- ADAPTIVE TASK STATE DRIVEN MODE SELECTOR ROW ---
+        val activeModeState = com.example.data.NovaLifeSystem.activeTaskMode.collectAsState()
+        val activeMode = activeModeState.value
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+                .background(TechCard, RoundedCornerShape(16.dp))
+                .border(1.dp, BorderSlate.copy(alpha = 0.25f), RoundedCornerShape(16.dp))
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(CyberCyan, CircleShape)
+                    )
+                    Text(
+                        text = "ACTIVE CHRONICLE MODULE // COGNITIVE PHASES",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CyberCyan,
+                        letterSpacing = 1.sp
+                    )
+                }
+                
+                Box(
+                    modifier = Modifier
+                        .background(
+                            when (activeMode) {
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> CyberCyan.copy(alpha = 0.15f)
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> TechTeal.copy(alpha = 0.15f)
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> NeonAmber.copy(alpha = 0.15f)
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> Color(0xFFBF5AF2).copy(alpha = 0.15f)
+                            },
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "LIVE",
+                        fontFamily = FontFamily.Monospace,
+                        color = when (activeMode) {
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> CyberCyan
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> TechTeal
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> NeonAmber
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> Color(0xFFBF5AF2)
+                        },
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Scrollable row of premium chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val modesList = listOf(
+                    Triple(com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY, "Standby", CyberCyan),
+                    Triple(com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING, "Messaging", TechTeal),
+                    Triple(com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING, "Inventory", NeonAmber),
+                    Triple(com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING, "Information", Color(0xFFBF5AF2))
+                )
+
+                modesList.forEach { (m, label, color) ->
+                    val isSelected = activeMode == m
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) color.copy(alpha = 0.18f) else CyberSlate)
+                            .border(
+                                width = if (isSelected) 1.2.dp else 0.8.dp,
+                                color = if (isSelected) color else BorderSlate.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable {
+                                com.example.data.NovaLifeSystem.updateActiveTaskMode(m, "Manual chip selection")
+                                speakTts("Engaging $label active module.")
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label.uppercase(),
+                            color = if (isSelected) color else PureWhite.copy(alpha = 0.7f),
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+            }
+        }
+
         // Persistent Accessibility Service status monitor (updates in real-time)
         val isServiceRunning = isAccessibilityActive
         
@@ -4804,6 +5408,226 @@ fun RedesignedOrbTab(
             letterSpacing = 1.sp
         )
 
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Real-time Cognitive Thought Stream Display
+        val thoughtsState = com.example.data.NovaLifeSystem.thoughtStreamLogs.collectAsState()
+        val thoughts = thoughtsState.value
+        val currentCognitiveStateState = com.example.data.NovaLifeSystem.liveState.collectAsState()
+        val currentCognitiveState = currentCognitiveStateState.value
+        val currentCognitiveMoodState = com.example.data.NovaLifeSystem.liveMood.collectAsState()
+        val currentCognitiveMood = currentCognitiveMoodState.value
+        val currentContextState = com.example.data.NovaLifeSystem.liveContext.collectAsState()
+        val currentContext = currentContextState.value
+        
+        // Collect human biological-psyche metrics live
+        val lifeEnergyState = com.example.data.NovaLifeSystem.energyLevel.collectAsState()
+        val lifeCreativityState = com.example.data.NovaLifeSystem.rawCreativity.collectAsState()
+        val lifeExistentialDepthState = com.example.data.NovaLifeSystem.existentialDepth.collectAsState()
+        val lifeFocusState = com.example.data.NovaLifeSystem.generalFocus.collectAsState()
+
+        AnimatedVisibility(
+            visible = thoughts.isNotEmpty(),
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .border(1.dp, CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.Black.copy(alpha = 0.4f)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(CyberCyan, CircleShape)
+                            )
+                            Text(
+                                text = "COGNITIVE THOUGHT STREAM",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CyberCyan,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        // State & Emotion indicator
+                        Text(
+                            text = "${currentCognitiveState.name} // ${currentCognitiveMood.name}",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TechTeal,
+                            modifier = Modifier
+                                .background(TechTeal.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val thoughtListState = rememberLazyListState()
+                    LaunchedEffect(thoughts.size) {
+                        if (thoughts.isNotEmpty()) {
+                            thoughtListState.animateScrollToItem(thoughts.size - 1)
+                        }
+                    }
+
+                    LazyColumn(
+                        state = thoughtListState,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 100.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(thoughts) { logLine ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = ">",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CyberCyan.copy(alpha = 0.6f)
+                                )
+                                Text(
+                                    text = logLine,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    color = PureWhite.copy(alpha = 0.9f),
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                    }
+
+                    if (currentContext != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = CyberCyan.copy(alpha = 0.1f), thickness = 0.5.dp)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "AWARENESS:",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TechTeal.copy(alpha = 0.8f)
+                            )
+
+                            val contextMap = listOf(
+                                "Time" to currentContext.currentTime,
+                                "Battery" to "${currentContext.batteryPct}%",
+                                "Net" to currentContext.connectivity,
+                                "Last App" to currentContext.lastAppOpened,
+                                "Contact" to currentContext.lastPersonContacted,
+                                "Topic" to currentContext.lastDiscussedTopic,
+                                "Mood" to currentContext.userMood
+                            ).filter { it.second.isNotEmpty() }
+
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(contextMap) { item ->
+                                    val (key, value) = item
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                                            .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "$key: $value",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            color = PureWhite.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Direct live representation of Human Biological & Psyche Telemetry metrics
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(color = CyberCyan.copy(alpha = 0.1f), thickness = 0.5.dp)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val OrangeGold = Color(0xFFFF9E00)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "HUMAN VITAL INDEX:",
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = OrangeGold.copy(alpha = 0.8f)
+                        )
+
+                        val vitalsMap = listOf(
+                            "Core Psyche Energy" to "${lifeEnergyState.value}%",
+                            "Creative Sparks" to "${lifeCreativityState.value}%",
+                            "Existential Wonder" to "${lifeExistentialDepthState.value}%",
+                            "Attention Span" to "${lifeFocusState.value}%"
+                        )
+
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(vitalsMap) { item ->
+                                val (key, value) = item
+                                Box(
+                                    modifier = Modifier
+                                        .background(OrangeGold.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                                        .border(0.5.dp, OrangeGold.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "$key: $value",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp,
+                                        color = PureWhite.copy(alpha = 0.85f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // 3. Simulated/Reactive Audio Waveform (Nothing OS premium visual)
@@ -4834,7 +5658,436 @@ fun RedesignedOrbTab(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- ADAPTIVE TASK ACTION TERMINAL ---
+        AnimatedContent(
+            targetState = activeMode,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(220, delayMillis = 90)) + scaleIn(initialScale = 0.95f, animationSpec = tween(220, delayMillis = 90)))
+                    .togetherWith(fadeOut(animationSpec = tween(150)))
+            },
+            label = "adaptive_terminal_anim"
+        ) { mode ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+                    .background(TechCard, RoundedCornerShape(20.dp))
+                    .border(
+                        width = 1.2.dp,
+                        color = when (mode) {
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> CyberCyan.copy(alpha = 0.25f)
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> TechTeal.copy(alpha = 0.25f)
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> NeonAmber.copy(alpha = 0.25f)
+                            com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> Color(0xFFBF5AF2).copy(alpha = 0.25f)
+                        },
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(16.dp)
+            ) {
+                // Header of Active Modality
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = when (mode) {
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> Icons.Default.Home
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> Icons.Default.Send
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> Icons.Default.Build
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> Icons.Default.Search
+                            },
+                            contentDescription = null,
+                            tint = when (mode) {
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> CyberCyan
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> TechTeal
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> NeonAmber
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> Color(0xFFBF5AF2)
+                            },
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = when (mode) {
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> "STANDBY OVERVIEW NODE"
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> "SECURE MESSAGE DISPATCHER"
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> "ACTIVE STOCK & INVENTORY REGISTERS"
+                                com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> "LIVE SPORTS SCORING & RESEARCH TERMINAL"
+                            },
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = PureWhite
+                        )
+                    }
+
+                    // Pulse indicator
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(
+                                color = when (mode) {
+                                    com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> CyberCyan
+                                    com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> TechTeal
+                                    com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> NeonAmber
+                                    com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> Color(0xFFBF5AF2)
+                                },
+                                shape = CircleShape
+                            )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 0.8.dp)
+                Spacer(modifier = Modifier.height(14.dp))
+
+                when (mode) {
+                    com.example.data.NovaLifeSystem.ActiveTaskMode.STANDBY -> {
+                        // Standby mode
+                        Text(
+                            text = "Aura Frequency Stabilized at 144Hz. Ready for vocal triggers. Subconscious thread running.",
+                            color = PureWhite.copy(alpha = 0.8f),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.SansSerif,
+                            lineHeight = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Small Stats Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(CyberSlate, RoundedCornerShape(10.dp))
+                                    .padding(10.dp)
+                            ) {
+                                Column {
+                                    Text("PENDING TASKS", fontSize = 8.sp, color = CharcoalMuted, fontFamily = FontFamily.Monospace)
+                                    Text("${tasksList.filter { it.status != "COMPLETED" }.size} Active", fontSize = 14.sp, color = CyberCyan, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(CyberSlate, RoundedCornerShape(10.dp))
+                                    .padding(10.dp)
+                            ) {
+                                Column {
+                                    Text("TRACKED STOCK", fontSize = 8.sp, color = CharcoalMuted, fontFamily = FontFamily.Monospace)
+                                    Text("${itemsList.size} Items", fontSize = 14.sp, color = CyberCyan, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    com.example.data.NovaLifeSystem.ActiveTaskMode.MESSAGING -> {
+                        // Messaging mode
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Adaptive contact routing mapped. Tap below to fast-dispatch simulated SMS / WhatsApp payloads via Nova Telephony:",
+                                color = PureWhite.copy(alpha = 0.7f),
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp
+                            )
+
+                            // Contact rows
+                            val contacts = listOf(
+                                "Mom" to "+91 94401 22849",
+                                "Nazeer" to "+91 88472 90114",
+                                "Dad" to "+91 93910 88210",
+                                "Bittu" to "+91 70132 11956"
+                            )
+
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(contacts) { (name, phone) ->
+                                    Box(
+                                        modifier = Modifier
+                                            .background(CyberSlate, RoundedCornerShape(12.dp))
+                                            .border(1.dp, TechTeal.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                val msg = "Hello $name, this is Kartik testing Nova Secure Dispatch Mode!"
+                                                processVocalDirective(
+                                                    cmd = "Send simulated text to $name saying $msg",
+                                                    context = context,
+                                                    viewModel = viewModel,
+                                                    tasksList = tasksList,
+                                                    itemsList = itemsList,
+                                                    speakTts = speakTts,
+                                                    uName = userName,
+                                                    onLogUpdate = { onDialogHistoryListChange(dialogHistoryList + it) },
+                                                    onActionAppend = { onRecentActionsChange(listOf(it) + recentActions.take(5)) }
+                                                )
+                                            }
+                                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(name, color = TechTeal, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                            Text(phone, color = PureWhite.copy(alpha = 0.5f), fontSize = 8.sp, fontFamily = FontFamily.Monospace)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Dynamic quick trigger actions
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val msgTriggers = listOf(
+                                    "Tell Dad I will reach home in 10 minutes",
+                                    "WhatsApp Nazeer about the project update"
+                                )
+                                msgTriggers.forEach { trigger ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                                            .border(0.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                processVocalDirective(
+                                                    cmd = trigger,
+                                                    context = context,
+                                                    viewModel = viewModel,
+                                                    tasksList = tasksList,
+                                                    itemsList = itemsList,
+                                                    speakTts = speakTts,
+                                                    uName = userName,
+                                                    onLogUpdate = { onDialogHistoryListChange(dialogHistoryList + it) },
+                                                    onActionAppend = { onRecentActionsChange(listOf(it) + recentActions.take(5)) }
+                                                )
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "\"$trigger\"", fontSize = 9.sp, color = PureWhite.copy(alpha = 0.8f), fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                            Text(text = "TAP TO RUN", fontSize = 8.sp, color = TechTeal, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    com.example.data.NovaLifeSystem.ActiveTaskMode.INVENTORY_TRACKING -> {
+                        // Inventory Tracking mode
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Database registers loaded. Modify stock levels interactively below with live threshold alerting:",
+                                color = PureWhite.copy(alpha = 0.7f),
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp
+                            )
+
+                            // Quick mini item view from DB
+                            val workingItemsList = if (itemsList.isNotEmpty()) {
+                                itemsList.take(3)
+                            } else {
+                                listOf(
+                                    com.example.data.InventoryItem(1, "Steel Reinforcement Rods", "5/8 inch robust rods", 45, 10, "Main Storage Yard", "Steel Core"),
+                                    com.example.data.InventoryItem(2, "Portland Cement", "Rapid hardening type A", 8, 15, "Silo Warehouse", "Cement Products"),
+                                    com.example.data.InventoryItem(3, "Flexible Wiring Reels", "12 gauge copper threads", 100, 20, "Store Room B", "Electricals")
+                                )
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                workingItemsList.forEach { item ->
+                                    val isLowStock = item.quantity <= item.minThreshold
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(CyberSlate, RoundedCornerShape(12.dp))
+                                            .border(1.dp, if (isLowStock) GlowingRed.copy(alpha = 0.25f) else NeonAmber.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                                            .padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                                Text(item.name, color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
+                                                if (isLowStock) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(GlowingRed.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text("LOW STOCK", color = GlowingRed, fontSize = 7.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                                    }
+                                                }
+                                            }
+                                            Text("Category: ${item.category} • Location: ${item.location}", color = CharcoalMuted, fontSize = 8.sp)
+                                        }
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            // Minus Button
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                                                    .clickable {
+                                                        if (itemsList.contains(item)) {
+                                                            viewModel.updateStockLevel(item, -1)
+                                                        } else {
+                                                            speakTts("Operating in simulated sandbox mode. Item '${item.name}' reduced.")
+                                                            onDialogHistoryListChange(dialogHistoryList + ConsoleMessage("SYSTEM", "Simulated Stock Update: '${item.name}' decremented."))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("-", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            }
+
+                                            // Actual stock text
+                                            Text(
+                                                text = "${item.quantity}",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (isLowStock) GlowingRed else NeonAmber
+                                            )
+
+                                            // Plus Button
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                                                    .border(0.5.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                                                    .clickable {
+                                                        if (itemsList.contains(item)) {
+                                                            viewModel.updateStockLevel(item, 1)
+                                                        } else {
+                                                            speakTts("Operating in simulated sandbox mode. Item '${item.name}' increased.")
+                                                            onDialogHistoryListChange(dialogHistoryList + ConsoleMessage("SYSTEM", "Simulated Stock Update: '${item.name}' incremented."))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text("+", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    com.example.data.NovaLifeSystem.ActiveTaskMode.INFORMATION_GATHERING -> {
+                        // Information Gathering mode
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Headless browser scraping engines online. Querying volatile sports parameters...",
+                                color = PureWhite.copy(alpha = 0.7f),
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp
+                            )
+
+                            // High-quality simulated sports match widget card
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(CyberSlate, RoundedCornerShape(12.dp))
+                                    .border(1.dp, Color(0xFFBF5AF2).copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "🏏 ICC MEN'S TOURNAMENT - LIVE",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 8.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFBF5AF2)
+                                        )
+
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .background(GlowingRed, CircleShape)
+                                            )
+                                            Text(
+                                                text = "OFFICIAL SCRAPE",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 7.sp,
+                                                color = GlowingRed,
+                                                fontWeight = FontWeight.ExtraBold
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("IND vs PAK Match updates:", color = PureWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(
+                                        text = "Pakistan chasing target of 160. Score: 142/6 (18.2 overs). Match is close and extremely active.",
+                                        fontSize = 11.sp,
+                                        color = PureWhite.copy(alpha = 0.85f),
+                                        lineHeight = 13.sp
+                                    )
+                                }
+                            }
+
+                            // Dynamic quick action tags
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val searchTags = listOf(
+                                    "Is it over?" to "is it",
+                                    "Next match?" to "next",
+                                    "IPL Standing" to "ipl points Table"
+                                )
+                                searchTags.forEach { (label, cmd) ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                                            .border(0.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                processVocalDirective(
+                                                    cmd = cmd,
+                                                    context = context,
+                                                    viewModel = viewModel,
+                                                    tasksList = tasksList,
+                                                    itemsList = itemsList,
+                                                    speakTts = speakTts,
+                                                    uName = userName,
+                                                    onLogUpdate = { onDialogHistoryListChange(dialogHistoryList + it) },
+                                                    onActionAppend = { onRecentActionsChange(listOf(it) + recentActions.take(5)) }
+                                                )
+                                            }
+                                            .padding(vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(label, color = Color(0xFFBF5AF2), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 4. Quick Actions Circle Row (Conforms exactly to mockup of 5 circular app actions)
         Row(
@@ -6129,6 +7382,12 @@ fun RedesignedRoutinesTab(
     recentActions: List<String>,
     onRecentActionsChange: (List<String>) -> Unit
 ) {
+    val routines by viewModel.routinesStream.collectAsState(initial = emptyList())
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    var newTrigger by remember { mutableStateOf("") }
+    var newActionsStr by remember { mutableStateOf("") }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -6136,119 +7395,305 @@ fun RedesignedRoutinesTab(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // --- Tab Header Row ---
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            listOf("My Routines", "Scheduled", "Recommended").forEach { tab ->
-                val isChosen = tab == "My Routines"
-                Box(
-                    modifier = Modifier
-                        .background(
-                            if (isChosen) CyberCyan else Color.Transparent,
-                            RoundedCornerShape(16.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (isChosen) Color.Transparent else BorderSlate.copy(alpha = 0.3f),
-                            RoundedCornerShape(16.dp)
-                        )
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = tab,
-                        color = if (isChosen) PureWhite else CharcoalMuted,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+            Column {
+                Text(
+                    text = "Teach Once, Use Forever",
+                    color = PureWhite,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "NOVA Custom Workflows Dashboard",
+                    color = CharcoalMuted,
+                    fontSize = 11.sp
+                )
+            }
+            
+            Button(
+                onClick = { showCreateDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, tint = PureWhite, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("New Routine", color = PureWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // --- Custom Creation Inline Panel / Dialog Box if active ---
+        if (showCreateDialog) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(TechCard, RoundedCornerShape(18.dp))
+                    .border(1.2.dp, CyberCyan.copy(alpha = 0.5f), RoundedCornerShape(18.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Teach Nova a New Workflow",
+                    color = CyberCyan,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Routine Name", color = CharcoalMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = PureWhite, fontSize = 12.sp),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(CyberCyan),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF13131F), RoundedCornerShape(8.dp))
+                            .border(1.dp, BorderSlate.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
                     )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Vocal Trigger Phrase (e.g. \"college mode\")", color = CharcoalMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = newTrigger,
+                        onValueChange = { newTrigger = it },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = PureWhite, fontSize = 12.sp),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(CyberCyan),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF13131F), RoundedCornerShape(8.dp))
+                            .border(1.dp, BorderSlate.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Actions (One command per line, e.g. \"Turn on DND\")", color = CharcoalMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    androidx.compose.foundation.text.BasicTextField(
+                        value = newActionsStr,
+                        onValueChange = { newActionsStr = it },
+                        textStyle = androidx.compose.ui.text.TextStyle(color = PureWhite, fontSize = 12.sp),
+                        cursorBrush = androidx.compose.ui.graphics.SolidColor(CyberCyan),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .background(Color(0xFF13131F), RoundedCornerShape(8.dp))
+                            .border(1.dp, BorderSlate.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                            .padding(10.dp)
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = {
+                        showCreateDialog = false
+                        newName = ""
+                        newTrigger = ""
+                        newActionsStr = ""
+                    }) {
+                        Text("Cancel", color = CharcoalMuted, fontSize = 11.sp)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (newName.isNotBlank() && newTrigger.isNotBlank() && newActionsStr.isNotBlank()) {
+                                val actionList = newActionsStr.split("\n")
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+                                if (actionList.isNotEmpty()) {
+                                    viewModel.insertRoutine(newName.trim(), newTrigger.trim().lowercase(), actionList)
+                                    showCreateDialog = false
+                                    newName = ""
+                                    newTrigger = ""
+                                    newActionsStr = ""
+                                    speakTts("Routine saved successfully!")
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Save Routine", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        data class RoutineMockItem(val name: String, val desc: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
-        val routinesMockList = listOf(
-            RoutineMockItem("Commute Mode", "Maps to home/work, Spotify music & notification reading.", Icons.Default.Place),
-            RoutineMockItem("Deep Work", "DND blocking social apps, Pomodoro, ambient lo-fi.", Icons.Default.Build),
-            RoutineMockItem("Night Protocol", "Dims screen, alarm set, status quiet setting.", Icons.Default.Info),
-            RoutineMockItem("Game Mode", "DND, max brightness, close background and optimized hub.", Icons.Default.Star),
-            RoutineMockItem("Interview Mode", "Opens prep notes, 45-min timer, WhatsApp silencer.", Icons.Default.Phone),
-            RoutineMockItem("YouTube Controller", "Hands-free video skip, comment open & reading.", Icons.Default.PlayArrow),
-            RoutineMockItem("Instagram Reader", "Read direct messages and auto-like viewport feed.", Icons.Default.Person),
-            RoutineMockItem("Morning Routine", "News, weather, alarm and study checklist.", Icons.Default.Check),
-            RoutineMockItem("Sleep Routine", "Silence phone, low screen brightness.", Icons.Default.Lock)
-        )
-
-        routinesMockList.forEach { item ->
-            val (name, desc, icon) = item
-            Row(
+        // --- Active Routines Vault ---
+        if (routines.isEmpty()) {
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(TechCard, RoundedCornerShape(18.dp))
-                    .border(1.dp, BorderSlate.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
-                    .padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .border(1.dp, BorderSlate.copy(alpha = 0.15f), RoundedCornerShape(18.dp))
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.weight(1f)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                            .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(icon, null, tint = CyberCyan, modifier = Modifier.size(18.dp))
-                    }
-                    Column {
-                        Text(name, color = PureWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text(desc, color = CharcoalMuted, fontSize = 10.sp, maxLines = 2)
-                    }
+                    Icon(Icons.Default.Build, null, tint = CharcoalMuted, modifier = Modifier.size(32.dp))
+                    Text("No workflows found", color = PureWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Say: \"Nova, when I say college mode: turn on DND, open Chrome...\" to teach me!", color = CharcoalMuted, fontSize = 10.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Button(
-                    onClick = {
-                        speakTts("Activating routine: $name")
-                        val directiveCode = when(name) {
-                            "Morning Routine" -> "good morning"
-                            "Sleep Routine" -> "start sleep mode"
-                            "YouTube Controller" -> "skip 30 seconds"
-                            "Instagram Reader" -> "read my dms"
-                            "Game Mode" -> "game mode"
-                            "Interview Mode" -> "interview mode"
-                            "Commute Mode" -> "commute mode"
-                            "Deep Work" -> "deep work"
-                            "Night Protocol" -> "night protocol"
-                            else -> "open maps"
-                        }
-                        processVocalDirective(
-                            cmd = directiveCode,
-                            context = context,
-                            viewModel = viewModel,
-                            tasksList = tasksList,
-                            itemsList = itemsList,
-                            speakTts = speakTts,
-                            uName = userName,
-                            onLogUpdate = { onDialogHistoryListChange(dialogHistoryList + it) },
-                            onActionAppend = { onRecentActionsChange(listOf(it) + recentActions.take(5)) }
-                        )
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    modifier = Modifier.height(28.dp)
+            }
+        } else {
+            routines.forEach { routine ->
+                val actions = routine.getActions()
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(TechCard, RoundedCornerShape(18.dp))
+                        .border(1.dp, BorderSlate.copy(alpha = 0.2f), RoundedCornerShape(18.dp))
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Run", color = PureWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                                .border(1.dp, CyberCyan.copy(alpha = 0.3f), RoundedCornerShape(10.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Star, null, tint = CyberCyan, modifier = Modifier.size(18.dp))
+                        }
+                        
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = routine.name,
+                                    color = PureWhite,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .background(CyberCyan.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "\"${routine.triggerPhrase}\"",
+                                        color = CyberCyan,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            
+                            // Displays mini action indicators
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                actions.forEachIndexed { i, act ->
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(4.dp)
+                                                .background(CyberCyan, CircleShape)
+                                        )
+                                        Text(act, color = CharcoalMuted, fontSize = 9.sp)
+                                    }
+                                }
+                            }
+
+                            // Stats row
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.padding(top = 2.dp)
+                            ) {
+                                Text(
+                                    text = "Used ${routine.usageCount} times",
+                                    color = CharcoalMuted,
+                                    fontSize = 8.sp
+                                )
+                                if (routine.lastUsed != null) {
+                                    val formattedTime = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault()).format(java.util.Date(routine.lastUsed))
+                                    Text(
+                                        text = "Last: $formattedTime",
+                                        color = CharcoalMuted,
+                                        fontSize = 8.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                if (actions.isNotEmpty()) {
+                                    val speechStr = "Activating routine: ${routine.name}. Running ${actions.size} actions."
+                                    speakTts(speechStr)
+                                    onDialogHistoryListChange(dialogHistoryList + ConsoleMessage("NOVA", speechStr))
+                                    onRecentActionsChange(listOf("Executing routine: ${routine.name}") + recentActions.take(5))
+                                    viewModel.recordRoutineUsage(routine.id)
+                                    
+                                    val combinedSteps = mutableListOf<com.example.AutomationStep>()
+                                    for (action in actions) {
+                                        val planned = com.example.AutomationEngine.planActions(action, context)
+                                        combinedSteps.addAll(planned)
+                                    }
+                                    if (combinedSteps.isNotEmpty()) {
+                                        com.example.AutomationEngine.runAutomation(
+                                            context = context,
+                                            plannedSteps = combinedSteps,
+                                            viewModel = viewModel,
+                                            speakNotification = { speech ->
+                                                onDialogHistoryListChange(dialogHistoryList + ConsoleMessage("NOVA", speech))
+                                                speakTts(speech)
+                                            }
+                                        )
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberCyan),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            modifier = Modifier.height(26.dp)
+                        ) {
+                            Text("Run", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        // Delete routine button
+                        IconButton(
+                            onClick = {
+                                viewModel.deleteRoutine(routine.id)
+                            },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(Icons.Default.Delete, null, tint = Color(0xFFFF453A), modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
             }
         }
@@ -8573,6 +10018,24 @@ fun RedesignedSettingsTab(
                             value = if (isAutomating) "EXECUTING AUTONOMOUS ACTION" else "LISTENING FOR INTENT ($intentState)",
                             color = if (isAutomating) NeonAmber else CyberCyan
                         )
+
+                        val lastRoute by com.example.data.BrainRouter.lastDiagnosticRoute.collectAsState()
+                        if (lastRoute != null) {
+                            Divider(color = BorderSlate.copy(alpha = 0.15f), thickness = 1.dp)
+                            Text(
+                                "BRAIN ROUTER LIVE DECISION", 
+                                color = NeonAmber, 
+                                fontSize = 9.sp, 
+                                fontWeight = FontWeight.Bold, 
+                                fontFamily = FontFamily.Monospace
+                            )
+                            DiagnosticRow("Input", lastRoute!!.input, PureWhite)
+                            DiagnosticRow("Intent", lastRoute!!.intent, CyberCyan)
+                            DiagnosticRow("Tool Selected", lastRoute!!.toolSelected, SageGreen)
+                            DiagnosticRow("Reason", lastRoute!!.reason, CharcoalMuted)
+                            DiagnosticRow("Result", lastRoute!!.result, PureWhite)
+                            DiagnosticRow("Verified", lastRoute!!.verified, if (lastRoute!!.verified == "YES") SageGreen else NeonAmber)
+                        }
 
                         Divider(color = BorderSlate.copy(alpha = 0.15f), thickness = 1.dp)
                         Text(

@@ -22,6 +22,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Boot Nova's autonomic self-reflection and conscious thought stream
+        com.example.data.NovaLifeSystem.startAutonomousSelfReflection(this)
         // Start foreground service for background execution reality checks and execution
         com.example.NovaForegroundService.start(this)
         setContent {

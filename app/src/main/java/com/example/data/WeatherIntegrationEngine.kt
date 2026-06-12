@@ -54,6 +54,17 @@ object WeatherIntegrationEngine {
                     }
                 }
 
+                // Strip trailing note commands or save hints to be robust
+                if (cityName.contains("and save") || cityName.contains("and note") || cityName.contains("to notes") || cityName.contains("to notepad")) {
+                    cityName = cityName.split(Regex("\\b(and|save|to|notes|notepad|it|for|keep)\\b"))[0].trim()
+                }
+
+                // Strip relative temporal or local buzzwords so we fallback to correct IP-based geolocation rather than geocoding the word 'today'
+                val checkCity = cityName.lowercase(java.util.Locale.ROOT).trim()
+                if (checkCity == "today" || checkCity == "now" || checkCity == "here" || checkCity == "local" || checkCity == "current" || checkCity == "tonight") {
+                    cityName = ""
+                }
+
                 var lat = 37.7749 // Default SF
                 var lon = -122.4194
                 var finalCityLabel = "San Francisco"

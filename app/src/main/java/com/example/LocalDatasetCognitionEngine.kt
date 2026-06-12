@@ -8,6 +8,123 @@ import java.util.Locale
 
 object LocalDatasetCognitionEngine {
 
+    private class SimpleMathParser(val str: String) {
+        private var pos = -1
+        private var ch = 0
+
+        private fun nextChar() {
+            ch = if (++pos < str.length) str[pos].code else -1
+        }
+
+        private fun eat(charToEat: Int): Boolean {
+            while (ch == ' '.code) nextChar()
+            if (ch == charToEat) {
+                nextChar()
+                return true
+            }
+            return false
+        }
+
+        fun parse(): Double {
+            nextChar()
+            val x = parseExpression()
+            if (pos < str.length) throw RuntimeException("Unexpected character: " + ch.toChar())
+            return x
+        }
+
+        private fun parseExpression(): Double {
+            var x = parseTerm()
+            while (true) {
+                if (eat('+'.code)) x += parseTerm()
+                else if (eat('-'.code)) x -= parseTerm()
+                else return x
+            }
+        }
+
+        private fun parseTerm(): Double {
+            var x = parseFactor()
+            while (true) {
+                if (eat('*'.code)) x *= parseFactor()
+                else if (eat('/'.code)) {
+                    val divisor = parseFactor()
+                    if (divisor == 0.0) throw ArithmeticException("Division by zero")
+                    x /= divisor
+                } else if (eat('%'.code)) {
+                    val divisor = parseFactor()
+                    if (divisor == 0.0) throw ArithmeticException("Modulo by zero")
+                    x %= divisor
+                } else return x
+            }
+        }
+
+        private fun parseFactor(): Double {
+            if (eat('+'.code)) return parseFactor()
+            if (eat('-'.code)) return -parseFactor()
+
+            var x: Double
+            val startPos = pos
+            if (eat('('.code)) {
+                x = parseExpression()
+                eat(')'.code)
+            } else if ((ch >= '0'.code && ch <= '9'.code) || ch == '.'.code) {
+                while ((ch >= '0'.code && ch <= '9'.code) || ch == '.'.code) nextChar()
+                x = str.substring(startPos, pos).toDouble()
+            } else {
+                throw RuntimeException("Unexpected character: " + ch.toChar())
+            }
+
+            return x
+        }
+    }
+
+    fun evaluateMathExpression(cmd: String): String? {
+        val clean = cmd.trim().lowercase(Locale.ROOT)
+            .replace("what is", "")
+            .replace("calculate", "")
+            .replace("solve", "")
+            .replace("whats", "")
+            .replace("?", "")
+            .trim()
+
+        // Replace textual operator synonyms
+        var expr = clean
+            .replace("plus", "+")
+            .replace("minus", "-")
+            .replace("multiplied by", "*")
+            .replace("divided by", "/")
+            .replace("times", "*")
+            .replace("into", "*")
+            .replace("x", "*")
+            .replace("by", "/")
+            .replace("\\s+".toRegex(), "")
+
+        if (expr.isEmpty()) return null
+
+        val validChars = Regex("""^[0-9+\-*/().%]+$""")
+        if (!validChars.matches(expr)) {
+            return null
+        }
+
+        return try {
+            val parser = SimpleMathParser(expr)
+            val result = parser.parse()
+            val formattedResult = if (result % 1 == 0.0) {
+                result.toLong().toString()
+            } else {
+                String.format(Locale.US, "%.4f", result).trimEnd('0').trimEnd('.')
+            }
+            val displayExpr = expr
+                .replace("+", " + ")
+                .replace("-", " - ")
+                .replace("*", " * ")
+                .replace("/", " / ")
+                .replace("%", " % ")
+            "The result of $displayExpr is $formattedResult."
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun queryLocalCognition(
         cmd: String,
         tasksList: List<Task>,
@@ -19,13 +136,29 @@ object LocalDatasetCognitionEngine {
     ): CognitionResult? {
         val clean = cmd.lowercase(Locale.ROOT).trim()
 
+        // --- OFFLINE MATHEMATICAL EVALUATOR INTENT ---
+        val mathResult = evaluateMathExpression(cmd)
+        if (mathResult != null) {
+            val responsePhrase = when (NovaPersonalityCore.activePersonality) {
+                "JARVIS" -> "Calculations complete, Sir. $mathResult"
+                "SAMANTHA" -> "I ran the numbers for you! $mathResult"
+                "GLADOS" -> "Arithmetic cycle complete. $mathResult. Back to testing now."
+                else -> mathResult
+            }
+            return CognitionResult(
+                speechResponse = responsePhrase,
+                actionLogged = "Calculated arithmetic calculation offline"
+            )
+        }
+
         // --- OFFLINE KNOWLEDGE INTERCEPTORS SYSTEM ---
         if (clean.contains("points table") || clean.contains("ipl points") || clean.contains("ipl table") ||
             clean.contains("bitcoin") || clean.contains("btc") ||
             clean.contains("who won today") || clean.contains("who won the match") || clean.contains("match result") ||
             clean.contains("time in ") || clean.contains("time of ") || clean.contains("timezone") ||
             clean.contains("weather") || clean.contains("temperature") || clean.contains("rain") ||
-            clean.contains("score") || clean.contains("cricket")
+            clean.contains("score") || clean.contains("cricket") ||
+            clean.contains("time") || clean.contains("date") || clean.contains("clock")
         ) {
             val responseBody = when {
                 clean.contains("points table") || clean.contains("ipl points") || clean.contains("ipl table") -> {
@@ -40,8 +173,12 @@ object LocalDatasetCognitionEngine {
                 clean.contains("match") || clean.contains("won today") -> {
                     "Checking live cricket databases... Today's IPL match was won by Kolkata Knight Riders, defeating Sunrisers Hyderabad by eight wickets in a dominant performance at Ahmedabad."
                 }
-                clean.contains("time in ") -> {
-                    val place = clean.substringAfter("time in ").replace("?", "").trim()
+                clean.contains("time in ") || clean.contains("time of ") -> {
+                    val place = if (clean.contains("time in ")) {
+                        clean.substringAfter("time in ")
+                    } else {
+                        clean.substringAfter("time of ")
+                    }.replace("?", "").trim()
                     if (place.isNotEmpty()) {
                         val tzId = when (place.lowercase(Locale.ROOT)) {
                             "new york", "ny" -> "America/New_York"
@@ -68,6 +205,19 @@ object LocalDatasetCognitionEngine {
                         }
                     } else {
                         "Please specify which city or country time zones you want to convert."
+                    }
+                }
+                clean.contains("time") || clean.contains("date") || clean.contains("clock") -> {
+                    val sdfTime = java.text.SimpleDateFormat("h:mm a", java.util.Locale.US)
+                    val sdfDate = java.text.SimpleDateFormat("EEEE, MMMM d, yyyy", java.util.Locale.US)
+                    val formattedTime = sdfTime.format(java.util.Date())
+                    val formattedDate = sdfDate.format(java.util.Date())
+                    
+                    when (NovaPersonalityCore.activePersonality) {
+                        "JARVIS" -> "Sir, the current time is $formattedTime on $formattedDate. All chronological systems are perfectly calibrated and aligned."
+                        "SAMANTHA" -> "It's $formattedTime right now, and today is $formattedDate. Time flies when we are hanging out, doesn't it?"
+                        "GLADOS" -> "The system clock reads $formattedTime on $formattedDate. Another second ticked away. Another moment of human time wasted."
+                        else -> "The current local time is $formattedTime and today's date is $formattedDate."
                     }
                 }
                 else -> {

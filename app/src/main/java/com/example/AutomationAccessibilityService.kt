@@ -129,7 +129,17 @@ class AutomationAccessibilityService : AccessibilityService() {
             for (app in list) {
                 val pkg = app.packageName.lowercase(Locale.ROOT)
                 val label = pm.getApplicationLabel(app).toString().lowercase(Locale.ROOT)
-                if (label.contains(lowerQuery) || pkg.contains(lowerQuery) || 
+                
+                // For very short queries, prevent loose naked containment matches.
+                // Require exact word matches or prefixes instead of simple substring matching.
+                val isLooseMatch = if (lowerQuery.length < 3) {
+                    val words = label.split(Regex("\\s+"))
+                    words.contains(lowerQuery) || label.startsWith(lowerQuery)
+                } else {
+                    label.contains(lowerQuery) || pkg.contains(lowerQuery)
+                }
+                
+                if (isLooseMatch || 
                     (lowerQuery == "insta" && label.contains("instagram")) ||
                     (lowerQuery == "fb" && label.contains("facebook")) ||
                     (lowerQuery == "yt" && label.contains("youtube"))) {

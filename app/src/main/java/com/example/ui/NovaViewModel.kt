@@ -25,6 +25,13 @@ class NovaViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    val routinesStream: StateFlow<List<com.example.data.Routine>> = database.routineDao.getAllRoutinesFlow()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     val inventoryStream: StateFlow<List<InventoryItem>> = repository.allItems
         .stateIn(
             scope = viewModelScope,
@@ -46,6 +53,40 @@ class NovaViewModel(application: Application) : AndroidViewModel(application) {
             refreshRuleLogs()
             // Automate dynamic launcher app discovery for on-device app matching and aliases
             com.example.AutomationEngine.discoverApps(application)
+
+            // Prepopulate some premium default routines if empty
+            try {
+                val currentRoutines = database.routineDao.getAllRoutinesSync()
+                if (currentRoutines.isEmpty()) {
+                    database.routineDao.insertRoutine(com.example.data.Routine(
+                        name = "College Mode",
+                        triggerPhrase = "college mode",
+                        actionsJson = com.example.data.Routine.serializeActions(listOf("Enable Do Not Disturb (DND)", "Open Google Chrome", "Set volume to 40%"))
+                    ))
+                    database.routineDao.insertRoutine(com.example.data.Routine(
+                        name = "Study Mode",
+                        triggerPhrase = "study mode",
+                        actionsJson = com.example.data.Routine.serializeActions(listOf("Open Settings", "Set volume to 0%", "Open Google Chrome", "search studying tips"))
+                    ))
+                    database.routineDao.insertRoutine(com.example.data.Routine(
+                        name = "Family Routine",
+                        triggerPhrase = "family routine",
+                        actionsJson = com.example.data.Routine.serializeActions(listOf("Call Mom", "open WhatsApp", "open YouTube"))
+                    ))
+                    database.routineDao.insertRoutine(com.example.data.Routine(
+                        name = "Gaming Mode",
+                        triggerPhrase = "gaming mode",
+                        actionsJson = com.example.data.Routine.serializeActions(listOf("Enable Do Not Disturb (DND)", "open YouTube", "Set volume to 75%"))
+                    ))
+                    database.routineDao.insertRoutine(com.example.data.Routine(
+                        name = "Night Protocol",
+                        triggerPhrase = "night protocol",
+                        actionsJson = com.example.data.Routine.serializeActions(listOf("Dim screen display to 5%", "Register wake alarm for 07:00 AM", "Enable Do Not Disturb (DND)"))
+                    ))
+                }
+            } catch (e: Exception) {
+                // Fail-safe
+            }
         }
     }
 
@@ -133,6 +174,29 @@ class NovaViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.runRulesForAll()
             refreshRuleLogs()
+        }
+    }
+
+    fun insertRoutine(name: String, triggerPhrase: String, actions: List<String>) {
+        viewModelScope.launch {
+            val routine = com.example.data.Routine(
+                name = name,
+                triggerPhrase = triggerPhrase,
+                actionsJson = com.example.data.Routine.serializeActions(actions)
+            )
+            database.routineDao.insertRoutine(routine)
+        }
+    }
+
+    fun deleteRoutine(routineId: Int) {
+        viewModelScope.launch {
+            database.routineDao.deleteById(routineId)
+        }
+    }
+
+    fun recordRoutineUsage(routineId: Int) {
+        viewModelScope.launch {
+            database.routineDao.incrementUsage(routineId, System.currentTimeMillis())
         }
     }
 }

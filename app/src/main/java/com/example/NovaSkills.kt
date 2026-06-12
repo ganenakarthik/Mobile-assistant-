@@ -465,18 +465,58 @@ class MapsSkill : AppTaskSkill {
     override val name = "MapsSkill"
     override fun canHandle(command: String): Boolean {
          val cmd = command.lowercase(Locale.ROOT)
-         return cmd.contains("maps") || cmd.contains("navigate") || cmd.contains("petrol") || cmd.contains("find ")
+         return cmd.contains("maps") || cmd.contains("navigate") || cmd.contains("petrol") || cmd.contains("find ") || cmd.contains("directions")
     }
     override fun requiredPermissions() = listOf("GPS Location")
     
     override fun buildPlan(command: String, context: Context): List<AutomationStep> {
-        val cmd = command.lowercase(Locale.ROOT)
-        val query = if (cmd.contains("petrol")) "nearest petrol bunk" else "nearest market"
+        val cmd = command.lowercase(Locale.ROOT).trim()
+        
+        // Determine whether this is a navigation intent
+        val isNavigation = cmd.contains("navigate") || cmd.contains("navigation") || cmd.contains("directions")
+        
+        // Clean prefixes to extract query
+        var query = command.trim()
+        val prefixes = listOf(
+            "navigate to ",
+            "navigation to ",
+            "directions to ",
+            "navigate ",
+            "open maps and search for ",
+            "open maps and search ",
+            "search for ",
+            "find the ",
+            "find ",
+            "search ",
+            "maps "
+        )
+        
+        var queryLower = query.lowercase(Locale.ROOT)
+        for (prefix in prefixes) {
+            if (queryLower.startsWith(prefix)) {
+                query = query.substring(prefix.length).trim()
+                queryLower = query.lowercase(Locale.ROOT)
+                break
+            }
+        }
+        
+        // Fallback or specific mappings for predefined scripts if queried loosely
+        if (query.lowercase(Locale.ROOT).trim() == "petrol" || query.lowercase(Locale.ROOT).trim() == "bunk") {
+            query = "nearest petrol bunk"
+        }
+        
+        val stepType = if (isNavigation) ActionType.OPEN_MAPS_NAVIGATION else ActionType.OPEN_MAPS_SEARCH
+        val stepDesc = if (isNavigation) {
+            "Open Google Maps with turn-by-turn directions to '$query'"
+        } else {
+            "Open Google Maps and search for '$query'"
+        }
+        
         return listOf(
             AutomationStep(
-                type = ActionType.OPEN_MAPS_SEARCH,
+                type = stepType,
                 target = query,
-                description = "Trigger maps deep-link query: '$query'."
+                description = stepDesc
             )
         )
     }
@@ -491,7 +531,8 @@ class SettingsSkill : AppTaskSkill {
     override val name = "SettingsSkill"
     override fun canHandle(command: String): Boolean {
         val cmd = command.lowercase(Locale.ROOT)
-        return cmd.contains("flashlight") || cmd.contains("brightness") || cmd.contains("dnd") || cmd.contains("disturb") || cmd.contains("torch")
+        return cmd.contains("flashlight") || cmd.contains("brightness") || cmd.contains("dnd") || cmd.contains("disturb") || cmd.contains("torch") ||
+                cmd.contains("wifi") || cmd.contains("wi-fi") || cmd.contains("bluetooth")
     }
     override fun requiredPermissions() = emptyList<String>()
     
@@ -505,6 +546,14 @@ class SettingsSkill : AppTaskSkill {
             cmd.contains("brightness") -> {
                 val digits = cmd.filter { it.isDigit() }.ifBlank { "40" }
                 listOf(AutomationStep(ActionType.BRIGHTNESS_MODE, digits, null, "Adjust display brightness level to $digits%"))
+            }
+            cmd.contains("wifi") || cmd.contains("wi-fi") -> {
+                val mode = if (cmd.contains("off") || cmd.contains("disable")) "off" else "on"
+                listOf(AutomationStep(ActionType.WIFI_CONTROL, mode, null, "Toggle Wi-Fi state: $mode"))
+            }
+            cmd.contains("bluetooth") -> {
+                val mode = if (cmd.contains("off") || cmd.contains("disable")) "off" else "on"
+                listOf(AutomationStep(ActionType.BLUETOOTH_CONTROL, mode, null, "Toggle Bluetooth state: $mode"))
             }
             else -> {
                 val mode = if (cmd.contains("off") || cmd.contains("disable")) "disable" else "enable"

@@ -6,11 +6,23 @@ import androidx.core.content.ContextCompat
 import java.util.Locale
 
 data class ContactCandidate(
-    val name: String,
+    val id: String = "",
+    val displayName: String,
     val phoneNumber: String,
-    val score: Float,
-    val source: String // "System" or "Simulated"
-)
+    val confidence: Float,
+    val label: String? = null,
+    val source: String = "System"
+) {
+    val name: String get() = displayName
+    val score: Float get() = confidence
+}
+
+sealed class CallResolutionState {
+    object NoMatch : CallResolutionState()
+    data class SingleMatch(val contact: ContactCandidate) : CallResolutionState()
+    data class MultipleMatches(val candidates: List<ContactCandidate>) : CallResolutionState()
+    data class BlockedEmergency(val number: String) : CallResolutionState()
+}
 
 object ContactResolver {
 
@@ -23,7 +35,10 @@ object ContactResolver {
         Pair("Rahul Sharma", "919988776655"),
         Pair("Priya Kapoor", "918877665544"),
         Pair("Amit Patel", "917766554433"),
-        Pair("Anjali Mehta", "916655443322")
+        Pair("Anjali Mehta", "916655443322"),
+        Pair("Hemanth College", "919494949494"),
+        Pair("Hemanth Home", "919393939393"),
+        Pair("Hemanth Old", "919292929292")
     )
 
     // Normalizes name by lowering case and stripping common emojis & symbols
@@ -45,80 +60,86 @@ object ContactResolver {
         val cmd = command.trim()
         val clean = cmd.lowercase(Locale.ROOT)
         
-        val knownContactKeywords = listOf("nazeer", "bittu", "mom", "dad", "rahul", "priya", "amit", "anjali")
+        val knownContactKeywords = listOf("nazeer", "bittu", "mom", "dad", "rahul", "priya", "amit", "anjali", "mohit", "hemanth")
         
-        // Let's normalize the prefix first by stripping off common command action keywords
-        val prefixRegex = Regex("^(send whatsapp notification to|send whatsapp message to|send whatsapp to|send sms to|send message to|send text to|message to|msg to|text to|tell to|send to|send whatsapp|send sms|send message|send text|message|msg|text|tell|send)\\s+", RegexOption.IGNORE_CASE)
-
-        // 0. Handle Pattern 1: "send {message} to {contact}" (by splitting on the last " to " if it separates a message from a known or potential contact)
-        if (clean.contains(" to ")) {
-            val toIdx = clean.lastIndexOf(" to ")
+        // 0. Extract platform suffixes first to keep the command clean
+        var stripped = cmd
+        val whatsappSuffixRegex = Regex("(?i)\\s+(on whatsapp|via whatsapp|on telegram|via telegram|on sms|via sms|on wa)$")
+        val suffixMatch = whatsappSuffixRegex.find(stripped)
+        if (suffixMatch != null) {
+            stripped = stripped.substring(0, suffixMatch.range.first).trim()
+        }
+        
+        val prefixRegex = Regex("^(whatsapp\\s+message\\s+to|whatsapp\\s+to|send\\s+whatsapp\\s+notification\\s+to|send\\s+whatsapp\\s+message\\s+to|send\\s+whatsapp\\s+to|send\\s+sms\\s+to|send\\s+message\\s+to|send\\s+text\\s+to|message\\s+to|msg\\s+to|text\\s+to|tell\\s+to|send\\s+to|send\\s+whatsapp|send\\s+sms|send\\s+message|send\\s+text|message|msg|text|tell|send)\\s+", RegexOption.IGNORE_CASE)
+        
+        // 1. Handle Pattern 1: "{command...} {message} to {contact}"
+        val strippedClean = stripped.lowercase(Locale.ROOT)
+        if (strippedClean.contains(" to ")) {
+            val toIdx = strippedClean.lastIndexOf(" to ")
             if (toIdx != -1) {
-                val possibleContact = cmd.substring(toIdx + 4).trim()
-                val beforeTo = cmd.substring(0, toIdx).trim()
+                val possibleContact = stripped.substring(toIdx + 4).trim()
+                val beforeTo = stripped.substring(0, toIdx).trim()
                 val msgPart = beforeTo.replace(prefixRegex, "").trim()
                 if (possibleContact.isNotEmpty() && msgPart.isNotEmpty()) {
-                    return Pair(possibleContact, cleanMessageBody(msgPart))
+                    val lowerContact = possibleContact.lowercase(Locale.ROOT)
+                    val greetings = setOf("hi", "hello", "hey", "yo", "sup")
+                    if (!greetings.contains(lowerContact)) {
+                        return Pair(possibleContact, cleanMessageBody(msgPart))
+                    }
                 }
             }
         }
-
-        var stripped = cmd.replace(prefixRegex, "").trim()
-        var strippedClean = stripped.lowercase(Locale.ROOT)
         
-        // If it still starts with "to ", strip it
-        if (strippedClean.startsWith("to ")) {
-            stripped = stripped.substring(3).trim()
-            strippedClean = stripped.lowercase(Locale.ROOT)
+        // Prepare main clean command without root verb
+        var body = stripped.replace(prefixRegex, "").trim()
+        var bodyClean = body.lowercase(Locale.ROOT)
+        
+        if (bodyClean.startsWith("to ")) {
+            body = body.substring(3).trim()
+            bodyClean = body.lowercase(Locale.ROOT)
         }
         
-        // 1. Try matching with known contacts first
+        // 2. Scan if we have a known contact keyword anywhere in the body
         for (contact in knownContactKeywords) {
-            if (strippedClean.startsWith(contact)) {
-                val contactLen = contact.length
-                val contactPart = stripped.substring(0, contactLen).trim()
-                val msgPart = stripped.substring(contactLen).trim()
-                // Strip leading spacer or punctuation from message like "saying ", "that ", ":", ","
-                val msgClean = cleanMessageBody(msgPart)
-                return Pair(contactPart, msgClean)
+            val idx = bodyClean.indexOf(contact)
+            if (idx != -1) {
+                // Known contact found! Let's extract the rest as message
+                val contactPart = body.substring(idx, idx + contact.length).trim()
+                val leftSide = body.substring(0, idx).trim()
+                val rightSide = body.substring(idx + contact.length).trim()
+                val msgPart = when {
+                    leftSide.isNotEmpty() && rightSide.isNotEmpty() -> "$leftSide $rightSide"
+                    leftSide.isNotEmpty() -> leftSide
+                    else -> rightSide
+                }
+                if (contactPart.isNotEmpty() && msgPart.isNotEmpty()) {
+                    return Pair(contactPart, cleanMessageBody(msgPart))
+                }
             }
         }
         
-        // 2. Fallback to space-split if we don't start with a known contact
-        val spaceIdx = stripped.indexOf(' ')
+        // 3. Fallback heuristic: If it starts with common greeting, first word/phrase is message, rest is contact name
+        val greetings = setOf("hi", "hello", "hey", "yo", "sup")
+        val words = body.split("\\s+".toRegex())
+        if (words.size >= 2) {
+            val firstWordLower = words.first().lowercase(Locale.ROOT)
+            if (greetings.contains(firstWordLower)) {
+                val contactPart = body.substring(words.first().length).trim()
+                val msgPart = words.first()
+                return Pair(contactPart, cleanMessageBody(msgPart))
+            }
+        }
+        
+        // 4. Fallback to space split: "{contact} {message}"
+        val spaceIdx = body.indexOf(' ')
         if (spaceIdx != -1) {
-            val contactPart = stripped.substring(0, spaceIdx).trim()
-            val msgPart = stripped.substring(spaceIdx + 1).trim()
+            val contactPart = body.substring(0, spaceIdx).trim()
+            val msgPart = body.substring(spaceIdx + 1).trim()
             return Pair(contactPart, cleanMessageBody(msgPart))
         }
         
-        // 3. Fallback to universal substring extract
-        var contactPart = "Rahul"
-        var msgPart = "hi"
-        
-        if (clean.contains(" saying ")) {
-            val lastIdx = clean.indexOf(" saying ")
-            msgPart = cmd.substring(lastIdx + 8).trim()
-            val before = cmd.substring(0, lastIdx).trim()
-            contactPart = before.replace(prefixRegex, "").trim()
-            if (contactPart.lowercase(Locale.ROOT).startsWith("to ")) {
-                contactPart = contactPart.substring(3).trim()
-            }
-        } else {
-            for (contact in knownContactKeywords) {
-                if (clean.contains(contact)) {
-                    contactPart = contact
-                    val contactIdx = clean.indexOf(contact)
-                    val afterContact = cmd.substring(contactIdx + contact.length).trim()
-                    if (afterContact.isNotEmpty()) {
-                        msgPart = afterContact
-                    }
-                    break
-                }
-            }
-        }
-        
-        return Pair(contactPart, cleanMessageBody(msgPart))
+        // Final ultimate fallback
+        return Pair(body.ifEmpty { "Rahul" }, "hi")
     }
 
     private fun cleanMessageBody(msg: String): String {
@@ -210,7 +231,16 @@ object ContactResolver {
                             if (name.isNotBlank() && number.isNotBlank()) {
                                 val score = calculateMatchScore(name, resolvedSearch)
                                 if (score > 0.35f) {
-                                    candidates.add(ContactCandidate(name, number, score, "System"))
+                                    val contactId = number.hashCode().toString()
+                                    val derivedLabel = if (name.contains(" ")) name.substring(name.indexOf(" ") + 1) else null
+                                    candidates.add(ContactCandidate(
+                                        id = contactId,
+                                        displayName = name,
+                                        phoneNumber = number,
+                                        confidence = score,
+                                        label = derivedLabel,
+                                        source = "System"
+                                    ))
                                 }
                             }
                         }
@@ -225,9 +255,29 @@ object ContactResolver {
         for ((name, number) in simulatedContacts) {
             val score = calculateMatchScore(name, resolvedSearch)
             if (score > 0.35f) {
+                val systemMatchExists = candidates.any {
+                    it.source == "System" && (
+                        sanitizeName(it.displayName) == sanitizeName(name) ||
+                        sanitizeName(it.displayName).contains(sanitizeName(name)) ||
+                        sanitizeName(name).contains(sanitizeName(it.displayName))
+                    )
+                }
+                if (systemMatchExists) {
+                    continue
+                }
+
                 // If the same number isn't already added from the system
                 if (candidates.none { it.phoneNumber == number }) {
-                    candidates.add(ContactCandidate(name, number, score, "Simulated"))
+                    val contactId = number.hashCode().toString()
+                    val derivedLabel = if (name.contains(" ")) name.substring(name.indexOf(" ") + 1) else null
+                    candidates.add(ContactCandidate(
+                        id = contactId,
+                        displayName = name,
+                        phoneNumber = number,
+                        confidence = score,
+                        label = derivedLabel,
+                        source = "Simulated"
+                    ))
                 }
             }
         }
@@ -236,6 +286,75 @@ object ContactResolver {
         return candidates.distinctBy { it.phoneNumber }
             .sortedByDescending { it.score }
             .take(5)
+    }
+
+    // Resolves cellular voice calls state based on confidence metrics & emergency safety rules
+    fun resolveCallState(context: Context, query: String): CallResolutionState {
+        val cleanQuery = query.lowercase(Locale.ROOT).trim()
+
+        // Helpfully strip standard calling intent prefix
+        var targetSearch = cleanQuery
+            .replace(Regex("^(call|dial|phone)\\s+"), "")
+            .replace("and put on speaker", "")
+            .replace("on speaker", "")
+            .trim()
+
+        if (targetSearch.isEmpty()) {
+            return CallResolutionState.NoMatch
+        }
+
+        // Emergency safety blocklist (Never auto-call)
+        val emergencyNumbers = listOf("100", "101", "102", "108", "112", "911", "999")
+        val numericOnly = targetSearch.filter { it.isDigit() }
+        if (emergencyNumbers.contains(numericOnly) || emergencyNumbers.contains(targetSearch)) {
+            return CallResolutionState.BlockedEmergency(targetSearch)
+        }
+
+        // Direct dial verification
+        val isDirectDial = targetSearch.all { it.isDigit() || it == '+' || it == '-' || it == ' ' }
+        if (isDirectDial) {
+            val digits = targetSearch.filter { it.isDigit() || it == '+' }
+            // Double check emergency numbers inside digits
+            val cleanDigits = digits.filter { it.isDigit() }
+            if (emergencyNumbers.contains(cleanDigits)) {
+                return CallResolutionState.BlockedEmergency(digits)
+            }
+            return CallResolutionState.SingleMatch(
+                ContactCandidate(
+                    id = "direct",
+                    displayName = targetSearch,
+                    phoneNumber = digits,
+                    confidence = 1.0f,
+                    label = "Direct Dial",
+                    source = "Direct"
+                )
+            )
+        }
+
+        // Query contact candidates
+        val candidates = resolveContact(context, targetSearch)
+        if (candidates.isEmpty()) {
+            return CallResolutionState.NoMatch
+        }
+
+        // Confidence Rules:
+        // - confidence >= 0.85 and one candidate -> SingleMatch (direct call)
+        // - multiple candidates above threshold -> MultipleMatches (ask selection)
+        // - confidence below threshold -> MultipleMatches (ask selection or fail safely)
+        val strongCandidates = candidates.filter { it.confidence >= 0.85f }
+
+        return when {
+            strongCandidates.size == 1 -> {
+                CallResolutionState.SingleMatch(strongCandidates.first())
+            }
+            strongCandidates.size > 1 -> {
+                CallResolutionState.MultipleMatches(strongCandidates)
+            }
+            else -> {
+                // If there's no strong candidate above 0.85, ask to select from candidates
+                CallResolutionState.MultipleMatches(candidates)
+            }
+        }
     }
 
     // Helper to parse robust YouTube search/play query string
@@ -366,10 +485,16 @@ object ContactResolver {
         // Multi-word exact matches
         if (cleanContactName.contains(" $cleanQuery") || cleanContactName.startsWith("$cleanQuery ")) return 0.95f
         
-        // General contains query
-        if (cleanContactName.contains(cleanQuery) || cleanQuery.contains(cleanContactName)) {
-            val ratio = minOf(cleanQuery.length.toFloat() / cleanContactName.length.toFloat(), 1.0f)
-            return 0.80f + (ratio * 0.15f) // Up to 0.95
+        // Word boundary startsWith or word matches (guarantees hi doesn't match Mohit)
+        val words = cleanContactName.split(" ")
+        for (word in words) {
+            if (word == cleanQuery) {
+                return 0.95f
+            }
+            if (word.startsWith(cleanQuery)) {
+                val ratio = cleanQuery.length.toFloat() / word.length.toFloat()
+                return 0.75f + (ratio * 0.20f)
+            }
         }
 
         // Spelling mistakes (Fuzzy Match using Lev Distance)

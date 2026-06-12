@@ -263,8 +263,22 @@ object NovaVoiceManager {
                         _synthLogMessage.value = "Online stream offline. Shifting parameters to local TTS."
                         
                         applySettings(tts)
-                        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, completionId)
-                        onComplete?.invoke()
+                        if (tts != null) {
+                            if (onComplete != null) {
+                                tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                                    override fun onStart(utteranceId: String?) {}
+                                    override fun onDone(utteranceId: String?) {
+                                        mainScope.launch { onComplete() }
+                                    }
+                                    override fun onError(utteranceId: String?) {
+                                        mainScope.launch { onComplete() }
+                                    }
+                                })
+                            }
+                            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, completionId)
+                        } else {
+                            onComplete?.invoke()
+                        }
                     }
                 }
             }
@@ -369,8 +383,22 @@ object NovaVoiceManager {
                     
                     // Fallback to high-quality system TTS
                     applySettings(tts)
-                    tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, completionId)
-                    onComplete?.invoke()
+                    if (tts != null) {
+                        if (onComplete != null) {
+                            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                                override fun onStart(utteranceId: String?) {}
+                                override fun onDone(utteranceId: String?) {
+                                    mainScope.launch { onComplete() }
+                                }
+                                override fun onError(utteranceId: String?) {
+                                    mainScope.launch { onComplete() }
+                                }
+                            })
+                        }
+                        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, completionId)
+                    } else {
+                        onComplete?.invoke()
+                    }
                 }
             }
         }
